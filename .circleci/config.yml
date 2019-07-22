@@ -1,0 +1,31 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: circleci/python:3.6.2
+    steps:
+      - checkout
+
+      - run:
+          name: install dependencies
+          command: |
+            python3 -m venv venv
+            . venv/bin/activate
+            pip install --upgrade pip
+            pip install .
+            pip install pylint pytest coverage
+            pylint target_redshift -d C,W,unexpected-keyword-arg,duplicate-code
+   
+      - run:
+          name: 'Unit and Integration Tests and Coverage'
+          command: |
+            . venv/bin/activate
+            coverage run -m pytest --disable-pytest-warnings tests
+            coverage report
+            coverage html -d coverage_html
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - build
