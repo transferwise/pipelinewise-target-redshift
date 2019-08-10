@@ -61,7 +61,7 @@ def column_type(schema_property):
     elif 'integer' in property_type and 'string' in property_type:
         column_type = 'character varying'
     elif 'integer' in property_type:
-        column_type = 'bigint'
+        column_type = 'numeric'
     elif 'boolean' in property_type:
         column_type = 'boolean'
 
