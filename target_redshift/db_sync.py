@@ -57,7 +57,7 @@ def column_type(schema_property):
     elif property_format == 'time':
         column_type = 'character varying'
     elif 'number' in property_type:
-        column_type = 'numeric'
+        column_type = 'float'
     elif 'integer' in property_type and 'string' in property_type:
         column_type = 'character varying'
     elif 'integer' in property_type:
