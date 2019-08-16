@@ -13,7 +13,7 @@ setup(name="pipelinewise-target-redshift",
       author="TransferWise",
       url='https://github.com/transferwise/pipelinewise-target-redshift',
       classifiers=[
-          'License :: OSI Approved :: MIT License',
+          'License :: OSI Approved :: Apache Software License',
           'Programming Language :: Python :: 3 :: Only'
       ],
       py_modules=["target_redshift"],
