@@ -215,7 +215,8 @@ class DbSync:
         # Init S3 client
         aws_session = boto3.session.Session(
             aws_access_key_id=self.connection_config.get('aws_access_key_id'),
-            aws_secret_access_key=self.connection_config.get('aws_secret_access_key')
+            aws_secret_access_key=self.connection_config.get('aws_secret_access_key'),
+            aws_session_token=self.connection_config.get('aws_session_token'),
         )
         credentials = aws_session.get_credentials().get_frozen_credentials()
 
@@ -384,9 +385,11 @@ class DbSync:
                 """.format(aws_role_arn=self.connection_config['aws_redshift_copy_role_arn']) if self.connection_config.get("aws_redshift_copy_role_arn") else """
                     ACCESS_KEY_ID '{aws_access_key_id}'
                     SECRET_ACCESS_KEY '{aws_secret_access_key}'
+                    {aws_session_token}
                 """.format(
                     aws_access_key_id=self.connection_config['aws_access_key_id'],
                     aws_secret_access_key=self.connection_config['aws_secret_access_key'],
+                    aws_session_token="SESSION_TOKEN '{}'".format(self.connection_config['aws_session_token']) if self.connection_config.get('aws_session_token') else '',
                 )
 
                 # Step 3: Generate copy options - Override defaults from config.json if defined
