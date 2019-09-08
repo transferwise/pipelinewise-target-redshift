@@ -80,7 +80,7 @@ class TestTargetRedshift(object):
         assert mapper(json_dt_or_null)   == 'timestamp without time zone'
         assert mapper(json_t)            == 'character varying(256)'
         assert mapper(json_t_or_null)    == 'character varying(256)'
-        assert mapper(json_num)          == 'float'
+        assert mapper(json_num)          == 'double precision'
         assert mapper(json_int)          == 'numeric'
         assert mapper(json_int_or_str)   == 'character varying(65535)'
         assert mapper(json_bool)         == 'boolean'

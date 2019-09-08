@@ -65,7 +65,7 @@ def column_type(schema_property, with_length=True):
         column_type = 'character varying'
         varchar_length = SHORT_VARCHAR_LENGTH
     elif 'number' in property_type:
-        column_type = 'float'
+        column_type = 'double precision'
     elif 'integer' in property_type and 'string' in property_type:
         column_type = 'character varying'
         varchar_length = LONG_VARCHAR_LENGTH
