@@ -56,7 +56,7 @@ class TestTargetRedshift(object):
 
 
     def test_column_type_mapping(self):
-        """Test JSON type to Snowflake column type mappings"""
+        """Test JSON type to Redshift column type mappings"""
         mapper = target_redshift.db_sync.column_type
 
         # Incoming JSON schema types
@@ -73,7 +73,7 @@ class TestTargetRedshift(object):
         json_obj =          {"type": ["object"]             }
         json_arr =          {"type": ["array"]              }
         
-        # Mapping from JSON schema types ot Snowflake column types
+        # Mapping from JSON schema types ot Redshift column types
         assert mapper(json_str)          == 'character varying(10000)'
         assert mapper(json_str_or_null)  == 'character varying(10000)'
         assert mapper(json_dt)           == 'timestamp without time zone'
@@ -105,17 +105,17 @@ class TestTargetRedshift(object):
             target_redshift.db_sync.stream_name_to_dict('my_catalog-my_schema-my_table') == \
             {"catalog_name": "my_catalog", "schema_name": "my_schema", "table_name": "my_table"}
 
-        # Snowflake table format (Custom '.' separator)
+        # Redshift table format (Custom '.' separator)
         assert \
             target_redshift.db_sync.stream_name_to_dict('my_table', separator='.') == \
             {"catalog_name": None, "schema_name": None, "table_name": "my_table"}
 
-        # Snowflake table format (Custom '.' separator)
+        # Redshift table format (Custom '.' separator)
         assert \
             target_redshift.db_sync.stream_name_to_dict('my_schema.my_table', separator='.') == \
             {"catalog_name": None, "schema_name": "my_schema", "table_name": "my_table"}
 
-        # Snowflake table format (Custom '.' separator)
+        # Redshift table format (Custom '.' separator)
         assert \
             target_redshift.db_sync.stream_name_to_dict('my_catalog.my_schema.my_table', separator='.') == \
             {"catalog_name": "my_catalog", "schema_name": "my_schema", "table_name": "my_table"}

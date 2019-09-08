@@ -9,7 +9,7 @@ def get_db_config():
     # Default configuration settings for integration tests.
     # --------------------------------------------------------------------------
     # The following values needs to be defined in environment variables with
-    # valid details to a Snowflake instace, AWS IAM role and an S3 bucket
+    # valid details to a Redshift cluster, AWS IAM role and an S3 bucket
     # --------------------------------------------------------------------------
     # Redshift cluster
     config['host'] = os.environ.get('TARGET_REDSHIFT_HOST')
