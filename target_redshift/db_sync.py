@@ -13,6 +13,9 @@ import datetime
 
 logger = singer.get_logger()
 
+DEFAULT_VARCHAR_LENGTH = 10000
+SHORT_VARCHAR_LENGTH = 256
+LONG_VARCHAR_LENGTH = 65535
 
 def validate_config(config):
     errors = []
@@ -41,12 +44,16 @@ def validate_config(config):
     return errors
 
 
-def column_type(schema_property):
+def column_type(schema_property, with_length=True):
     property_type = schema_property['type']
     property_format = schema_property['format'] if 'format' in schema_property else None
     column_type = 'character varying'
+    varchar_length = DEFAULT_VARCHAR_LENGTH
+    if schema_property.get('maxLength', 0) > varchar_length:
+        varchar_length = LONG_VARCHAR_LENGTH
     if 'object' in property_type or 'array' in property_type:
         column_type = 'character varying'
+        varchar_length = LONG_VARCHAR_LENGTH
 
     # Every date-time JSON value is currently mapped to TIMESTAMP WITHOUT TIME ZONE
     #
@@ -56,14 +63,21 @@ def column_type(schema_property):
         column_type = 'timestamp without time zone'
     elif property_format == 'time':
         column_type = 'character varying'
+        varchar_length = SHORT_VARCHAR_LENGTH
     elif 'number' in property_type:
         column_type = 'float'
     elif 'integer' in property_type and 'string' in property_type:
         column_type = 'character varying'
+        varchar_length = LONG_VARCHAR_LENGTH
     elif 'integer' in property_type:
         column_type = 'numeric'
     elif 'boolean' in property_type:
         column_type = 'boolean'
+
+    # Add max length to column type if required
+    if with_length:
+        if column_type == 'character varying' and varchar_length > 0:
+            column_type = '{}({})'.format(column_type, varchar_length)
 
     return column_type
 
@@ -547,7 +561,7 @@ class DbSync:
             ))
             for (name, properties_schema) in self.flatten_schema.items()
             if name.lower() in columns_dict and
-               columns_dict[name.lower()]['data_type'].lower() != column_type(properties_schema).lower() and
+               columns_dict[name.lower()]['data_type'].lower() != column_type(properties_schema, with_length=False).lower() and
 
                # Don't alter table if 'timestamp without time zone' detected as the new required column type
                #

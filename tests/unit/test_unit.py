@@ -74,18 +74,18 @@ class TestTargetRedshift(object):
         json_arr =          {"type": ["array"]              }
         
         # Mapping from JSON schema types ot Snowflake column types
-        assert mapper(json_str) == 'character varying'
-        assert mapper(json_str_or_null)  , 'character varying'
-        assert mapper(json_dt)           , 'timestamp without time zone'
-        assert mapper(json_dt_or_null)   , 'timestamp without time zone'
-        assert mapper(json_t)            , 'character varying'
-        assert mapper(json_t_or_null)    , 'character varying'
-        assert mapper(json_num)          , 'numeric'
-        assert mapper(json_int)          , 'bigint'
-        assert mapper(json_int_or_str)   , 'character varying'
-        assert mapper(json_bool)         , 'boolean'
-        assert mapper(json_obj)          , 'character varying'
-        assert mapper(json_arr)          , 'character varying'
+        assert mapper(json_str)          == 'character varying(10000)'
+        assert mapper(json_str_or_null)  == 'character varying(10000)'
+        assert mapper(json_dt)           == 'timestamp without time zone'
+        assert mapper(json_dt_or_null)   == 'timestamp without time zone'
+        assert mapper(json_t)            == 'character varying(256)'
+        assert mapper(json_t_or_null)    == 'character varying(256)'
+        assert mapper(json_num)          == 'float'
+        assert mapper(json_int)          == 'numeric'
+        assert mapper(json_int_or_str)   == 'character varying(65535)'
+        assert mapper(json_bool)         == 'boolean'
+        assert mapper(json_obj)          == 'character varying(65535)'
+        assert mapper(json_arr)          == 'character varying(65535)'
 
 
     def test_stream_name_to_dict(self):
