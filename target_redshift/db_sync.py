@@ -292,7 +292,7 @@ class DbSync:
 
 
     def query(self, query, params=None):
-        logger.info("REDSHIFT - Running query: {}".format(query))
+        logger.debug("REDSHIFT - Running query: {}".format(query))
         with self.open_connection() as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                 cur.execute(
@@ -383,7 +383,7 @@ class DbSync:
                     self.connection_config['aws_access_key_id'],
                     self.connection_config['aws_secret_access_key']
                 )
-                logger.info("REDSHIFT - {}".format(copy_sql))
+                logger.debug("REDSHIFT - {}".format(copy_sql))
                 cur.execute(copy_sql)
 
                 # Step 3/a: Insert or Update if primary key defined
@@ -403,7 +403,7 @@ class DbSync:
                         self.primary_key_merge_condition(),
                         ' AND '.join(['{}.{} IS NULL'.format(self.target_table, c) for c in self.primary_column_names])
                     )
-                    logger.info("REDSHIFT - {}".format(insert_sql))
+                    logger.debug("REDSHIFT - {}".format(insert_sql))
                     cur.execute(insert_sql)
 
                     # Step 3/a/2: Update existing records
@@ -417,7 +417,7 @@ class DbSync:
                         self.stage_table,
                         self.primary_key_merge_condition()
                     )
-                    logger.info("REDSHIFT - {}".format(update_sql))
+                    logger.debug("REDSHIFT - {}".format(update_sql))
                     cur.execute(update_sql)
 
                 # Step 3/b: Insert only if no primary key
@@ -431,7 +431,7 @@ class DbSync:
                         ', '.join(['s.{}'.format(c['name']) for c in columns_with_trans]),
                         self.stage_table
                     )
-                    logger.info("REDSHIFT - {}".format(insert_sql))
+                    logger.debug("REDSHIFT - {}".format(insert_sql))
                     cur.execute(insert_sql)
 
                 # Step 4: Drop stage table
