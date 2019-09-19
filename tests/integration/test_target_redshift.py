@@ -233,7 +233,7 @@ class TestTargetRedshift(object):
                     {'c_int': 3, 'c_pk': 3, 'c_varchar': 'Russian: Зарегистрируйтесь сейчас на Десятую Международную Конференцию по'},
                     {'c_int': 4, 'c_pk': 4, 'c_varchar': 'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช'},
                     {'c_int': 5, 'c_pk': 5, 'c_varchar': 'Arabic: لقد لعبت أنت وأصدقاؤك لمدة وحصلتم علي من إجمالي النقاط'},
-                    {'c_int': 6, 'c_pk': 6, 'c_varchar': 'Special Characters: [",\'!@£$%^&*()]'}
+                    {'c_int': 6, 'c_pk': 6, 'c_varchar': 'Special Characters: ["\\,\'!@£$%^&*()]\\\\'}
             ]
 
 
