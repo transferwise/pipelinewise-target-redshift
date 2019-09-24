@@ -356,7 +356,6 @@ class TestTargetRedshift(object):
             }]
 
 
-
     def test_column_name_change(self):
         """Tests correct renaming of redshift columns after source change"""
         tap_lines_before_column_name_change = test_utils.get_test_tap_lines('messages-with-three-streams.json')
@@ -409,4 +408,65 @@ class TestTargetRedshift(object):
                 {'c_int': 3, 'c_pk': 3, 'c_time': '23:00:03', 'c_varchar': '3', 'c_time_renamed': '08:15:00'},
                 {'c_int': 4, 'c_pk': 4, 'c_time': None, 'c_varchar': '4', 'c_time_renamed': '23:00:03'}
             ]
+
+
+    def test_grant_privileges(self):
+        """Tests GRANT USAGE and SELECT privileges on newly created tables"""
+        tap_lines = test_utils.get_test_tap_lines('messages-with-three-streams.json')
+
+        # Create test users and groups
+        redshift = DbSync(self.config)
+        redshift.query("DROP USER IF EXISTS user_1")
+        redshift.query("DROP USER IF EXISTS user_2")
+        try:
+            redshift.query("DROP GROUP group_1") # DROP GROUP has no IF EXISTS
+        except:
+            pass
+        try:
+            redshift.query("DROP GROUP group_2")
+        except:
+            pass
+        redshift.query("CREATE USER user_1 WITH PASSWORD 'Abcdefgh1234'")
+        redshift.query("CREATE USER user_2 WITH PASSWORD 'Abcdefgh1234'")
+        redshift.query("CREATE GROUP group_1 WITH USER user_1, user_2")
+        redshift.query("CREATE GROUP group_2 WITH USER user_2")
+
+        # When grantees is a string then privileges should be granted to single user
+        redshift.query("DROP SCHEMA IF EXISTS {} CASCADE".format(self.config['default_target_schema']))
+        self.config['default_target_schema_select_permissions'] = 'user_1'
+        target_redshift.persist_lines(self.config, tap_lines)
+
+        # When grantees is a list then privileges should be granted to list of user
+        redshift.query("DROP SCHEMA IF EXISTS {} CASCADE".format(self.config['default_target_schema']))
+        self.config['default_target_schema_select_permissions'] = ['user_1', 'user_2']
+        target_redshift.persist_lines(self.config, tap_lines)
+
+        # Grant privileges to list of users
+        redshift.query("DROP SCHEMA IF EXISTS {} CASCADE".format(self.config['default_target_schema']))
+        self.config['default_target_schema_select_permissions'] = {'users': ['user_1', 'user_2']}
+        target_redshift.persist_lines(self.config, tap_lines)
+
+        # Grant privileges to list of groups
+        redshift.query("DROP SCHEMA IF EXISTS {} CASCADE".format(self.config['default_target_schema']))
+        self.config['default_target_schema_select_permissions'] = {'groups': ['group_1', 'group_2']}
+        target_redshift.persist_lines(self.config, tap_lines)
+
+        # Grant privileges to mix of list of users and groups
+        redshift.query("DROP SCHEMA IF EXISTS {} CASCADE".format(self.config['default_target_schema']))
+        self.config['default_target_schema_select_permissions'] = {
+            'users': ['user_1', 'user_2'],
+            'groups': ['group_1', 'group_2']}
+        target_redshift.persist_lines(self.config, tap_lines)
+
+        # Granting not existing user should raise exception
+        redshift.query("DROP SCHEMA IF EXISTS {} CASCADE".format(self.config['default_target_schema']))
+        with pytest.raises(Exception):
+            self.config['default_target_schema_select_permissions'] = {'users': ['user_not_exists_1', 'user_not_exists_2']}
+            target_redshift.persist_lines(self.config, tap_lines)
+
+        # Granting not existing group should raise exception
+        redshift.query("DROP SCHEMA IF EXISTS {} CASCADE".format(self.config['default_target_schema']))
+        with pytest.raises(Exception):
+            self.config['default_target_schema_select_permissions'] = {'groups': ['group_not_exists_1', 'group_not_exists_2']}
+            target_redshift.persist_lines(self.config, tap_lines)
 

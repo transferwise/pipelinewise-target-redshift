@@ -241,7 +241,10 @@ class DbSync:
             #                                           "schema_mapping": {
             #                                               "my_tap_stream_id": {
             #                                                   "target_schema": "my_redshift_schema",
-            #                                                   "target_schema_select_permissions": [ "role_with_select_privs" ]
+            #                                                   "target_schema_select_permissions": {
+            #                                                       "users": [ "user_1", "user_2" ],
+            #                                                       "groups": [ "group_1", "group_2" ]
+            #                                                   }
             #                                               }
             #                                           }
             config_default_target_schema = self.connection_config.get('default_target_schema', '').strip()
@@ -271,7 +274,10 @@ class DbSync:
             #                                                           "schema_mapping": {
             #                                                               "my_tap_stream_id": {
             #                                                                   "target_schema": "my_redshift_schema",
-            #                                                                   "target_schema_select_permissions": [ "role_with_select_privs" ]
+            #                                                                   "target_schema_select_permissions": {
+            #                                                                       "users": [ "user_1", "user_2" ],
+            #                                                                       "groups": [ "group_1", "group_2" ]
+            #                                                                   }
             #                                                               }
             #                                                           }
             self.grantees = self.connection_config.get('default_target_schema_select_permissions')
@@ -468,25 +474,31 @@ class DbSync:
         return 'DROP TABLE IF EXISTS {}'.format(self.stage_table if is_stage else self.target_table)
 
 
-    def grant_usage_on_schema(self, schema_name, grantee):
-        query = "GRANT USAGE ON SCHEMA {} TO ROLE {}".format(schema_name, grantee)
+    def grant_usage_on_schema(self, schema_name, grantee, to_group=False):
+        query = "GRANT USAGE ON SCHEMA {} TO {} {}".format(schema_name, 'GROUP' if to_group else '', grantee)
         logger.info("Granting USAGE privilegue on '{}' schema to '{}'... {}".format(schema_name, grantee, query))
         self.query(query)
 
 
-    def grant_select_on_all_tables_in_schema(self, schema_name, grantee):
-        query = "GRANT SELECT ON ALL TABLES IN SCHEMA {} TO ROLE {}".format(schema_name, grantee)
+    def grant_select_on_all_tables_in_schema(self, schema_name, grantee, to_group=False):
+        query = "GRANT SELECT ON ALL TABLES IN SCHEMA {} TO {} {}".format(schema_name, 'GROUP' if to_group else '', grantee)
         logger.info("Granting SELECT ON ALL TABLES privilegue on '{}' schema to '{}'... {}".format(schema_name, grantee, query))
         self.query(query)
 
 
     @classmethod
-    def grant_privilege(self, schema, grantees, grant_method):
+    def grant_privilege(self, schema, grantees, grant_method, to_group=False):
         if isinstance(grantees, list):
             for grantee in grantees:
-                grant_method(schema, grantee)
+                grant_method(schema, grantee,to_group)
         elif isinstance(grantees, str):
-            grant_method(schema, grantees)
+            grant_method(schema, grantees, to_group)
+        elif isinstance(grantees, dict):
+            users = grantees.get('users')
+            groups = grantees.get('groups')
+
+            self.grant_privilege(schema, users, grant_method)
+            self.grant_privilege(schema, groups, grant_method, to_group=True)
 
 
     def delete_rows(self, stream):
