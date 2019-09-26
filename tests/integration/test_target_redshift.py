@@ -184,6 +184,17 @@ class TestTargetRedshift(object):
         self.assert_three_streams_are_loaded_in_redshift(should_metadata_columns_exist=True)
 
 
+    def test_loading_tables_with_defined_parallelism(self):
+        """Loading multiple tables from the same input tap with various columns types"""
+        tap_lines = test_utils.get_test_tap_lines('messages-with-three-streams.json')
+
+        # Turning on adding metadata columns
+        self.config['parallelism'] = 1
+        target_redshift.persist_lines(self.config, tap_lines)
+
+        self.assert_three_streams_are_loaded_in_redshift()
+
+
     def test_loading_tables_with_hard_delete(self):
         """Loading multiple tables from the same input tap with deleted rows"""
         tap_lines = test_utils.get_test_tap_lines('messages-with-three-streams.json')

@@ -91,6 +91,7 @@ def persist_lines(config, lines):
     stream_to_sync = {}
     batch_size_rows = config.get('batch_size_rows', 100000)
     table_columns_cache = None
+    parallelism = config.get("parallelism", -1)
 
     # Cache the available schemas, tables and columns from redshift if not disabled in config
     # The cache will be used later use to avoid lot of small queries hitting redshift
@@ -201,7 +202,7 @@ def persist_lines(config, lines):
 
 
     # Single-host, thread-based parallelism
-    with parallel_backend('threading', n_jobs=-1):
+    with parallel_backend('threading', n_jobs=parallelism):
         Parallel()(delayed(load_stream_batch)(
             stream=stream,
             records_to_load=records_to_load[stream],
