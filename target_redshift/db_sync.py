@@ -374,20 +374,27 @@ class DbSync:
                 cur.execute(self.drop_table_query(is_stage=True))
                 cur.execute(self.create_table_query(is_stage=True))
 
+                # Step 2: Generate copy options - Override defaults from config.json if defined
+                copy_options = self.connection_config.get('copy_options',"""
+                    DELIMITER ',' REMOVEQUOTES ESCAPE
+                    EMPTYASNULL BLANKSASNULL TRIMBLANKS TRUNCATECOLUMNS
+                    TIMEFORMAT 'auto'
+                    COMPUPDATE OFF STATUPDATE OFF
+                """)
+
                 # Step 2: Load into the stage table
                 copy_sql = """COPY {} ({}) FROM 's3://{}/{}'
                     ACCESS_KEY_ID '{}'
                     SECRET_ACCESS_KEY '{}'
-                    DELIMITER ',' REMOVEQUOTES ESCAPE
-                    BLANKSASNULL TIMEFORMAT 'auto'
-                    COMPUPDATE OFF STATUPDATE OFF
+                    {}
                 """.format(
                     self.stage_table,
                     ', '.join([c['name'] for c in columns_with_trans]),
                     self.connection_config['s3_bucket'],
                     s3_key,
                     self.connection_config['aws_access_key_id'],
-                    self.connection_config['aws_secret_access_key']
+                    self.connection_config['aws_secret_access_key'],
+                    copy_options
                 )
                 logger.debug("REDSHIFT - {}".format(copy_sql))
                 cur.execute(copy_sql)
