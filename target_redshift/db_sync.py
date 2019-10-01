@@ -376,7 +376,6 @@ class DbSync:
 
                 # Step 2: Generate copy options - Override defaults from config.json if defined
                 copy_options = self.connection_config.get('copy_options',"""
-                    DELIMITER ',' REMOVEQUOTES ESCAPE
                     EMPTYASNULL BLANKSASNULL TRIMBLANKS TRUNCATECOLUMNS
                     TIMEFORMAT 'auto'
                     COMPUPDATE OFF STATUPDATE OFF
@@ -387,6 +386,7 @@ class DbSync:
                     ACCESS_KEY_ID '{}'
                     SECRET_ACCESS_KEY '{}'
                     {}
+                    DELIMITER ',' REMOVEQUOTES ESCAPE
                 """.format(
                     self.stage_table,
                     ', '.join([c['name'] for c in columns_with_trans]),
