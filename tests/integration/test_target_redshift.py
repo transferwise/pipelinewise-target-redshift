@@ -268,7 +268,7 @@ class TestTargetRedshift(object):
             ] == \
             [
                 {'c_int': 4, 'c_pk': 4, 'len': 4017},
-                {'c_int': 5, 'c_pk': 5, 'len': 32003},
+                {'c_int': 5, 'c_pk': 5, 'len': 32002},
             ]
 
 
@@ -468,5 +468,24 @@ class TestTargetRedshift(object):
         redshift.query("DROP SCHEMA IF EXISTS {} CASCADE".format(self.config['default_target_schema']))
         with pytest.raises(Exception):
             self.config['default_target_schema_select_permissions'] = {'groups': ['group_not_exists_1', 'group_not_exists_2']}
+            target_redshift.persist_lines(self.config, tap_lines)
+
+
+    def test_custom_copy_options(self):
+        """Test loading data with custom copy options"""
+        tap_lines = test_utils.get_test_tap_lines('messages-with-three-streams.json')
+
+        # Loading with identical copy option should pass
+        self.config['copy_options'] = 'CSV EMPTYASNULL TRIMBLANKS FILLRECORD TRUNCATECOLUMNS'
+        target_redshift.persist_lines(self.config, tap_lines)
+
+
+    def test_invalid_custom_copy_options(self):
+        """Tests loading data with custom copy options"""
+        tap_lines = test_utils.get_test_tap_lines('messages-with-three-streams.json')
+
+        # Loading with invalid custom copy option should raise exception
+        self.config['copy_options'] = '_INVALID_COPY_OPTION_'
+        with pytest.raises(Exception):
             target_redshift.persist_lines(self.config, tap_lines)
 
