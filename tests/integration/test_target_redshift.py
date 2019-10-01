@@ -476,7 +476,7 @@ class TestTargetRedshift(object):
         tap_lines = test_utils.get_test_tap_lines('messages-with-three-streams.json')
 
         # Loading with identical copy option should pass
-        self.config['copy_options'] = 'CSV EMPTYASNULL TRIMBLANKS FILLRECORD TRUNCATECOLUMNS'
+        self.config['copy_options'] = 'EMPTYASNULL TRIMBLANKS FILLRECORD TRUNCATECOLUMNS'
         target_redshift.persist_lines(self.config, tap_lines)
 
 
