@@ -491,6 +491,30 @@ class TestTargetRedshift(object):
         target_redshift.persist_lines(self.config, tap_lines)
 
 
+    def test_copy_using_aws_environment(self):
+        """Test loading data with aws in the environment rather than explicitly provided access keys"""
+        tap_lines = test_utils.get_test_tap_lines('messages-with-three-streams.json')
+
+        try:
+            os.environ["AWS_ACCESS_KEY_ID"] = os.environ.get('TARGET_REDSHIFT_AWS_ACCESS_KEY')
+            os.environ["AWS_SECRET_ACCESS_KEY"] = os.environ.get('TARGET_REDSHIFT_AWS_SECRET_ACCESS_KEY')
+            config['aws_access_key_id'] = None
+            config['aws_secret_access_key'] = None
+
+            target_redshift.persist_lines(self.config, tap_lines)
+        finally:
+            del os.environ["AWS_ACCESS_KEY_ID"]
+            del os.environ["AWS_SECRET_ACCESS_KEY"]
+
+
+    def test_copy_using_role_arn(self):
+        """Test loading data with aws role arn rather than aws access keys"""
+        tap_lines = test_utils.get_test_tap_lines('messages-with-three-streams.json')
+
+        self.config['aws_redshift_copy_role_arn'] = os.environ.get('TARGET_REDSHIFT_AWS_REDSHIFT_COPY_ROLE_ARN')
+        target_redshift.persist_lines(self.config, tap_lines)
+
+
     def test_invalid_custom_copy_options(self):
         """Tests loading data with custom copy options"""
         tap_lines = test_utils.get_test_tap_lines('messages-with-three-streams.json')
@@ -499,4 +523,3 @@ class TestTargetRedshift(object):
         self.config['copy_options'] = '_INVALID_COPY_OPTION_'
         with pytest.raises(Exception):
             target_redshift.persist_lines(self.config, tap_lines)
-

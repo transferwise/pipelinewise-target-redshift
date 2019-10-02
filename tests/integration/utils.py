@@ -34,6 +34,7 @@ def get_db_config():
     config['schema_mapping'] = None
     config['add_metadata_columns'] = None
     config['hard_delete'] = None
+    config['aws_redshift_copy_role_arn'] = None
 
 
     return config
