@@ -25,8 +25,6 @@ def validate_config(config):
         'user',
         'password',
         'dbname',
-        'aws_access_key_id',
-        'aws_secret_access_key',
         's3_bucket'
     ]
 
@@ -215,11 +213,17 @@ class DbSync:
         self.stream_schema_message = stream_schema_message
 
         # Init S3 client
-        self.s3 = boto3.client(
-            's3',
-            aws_access_key_id=self.connection_config['aws_access_key_id'],
-            aws_secret_access_key=self.connection_config['aws_secret_access_key']
+        aws_session = boto3.session.Session(
+            aws_access_key_id=self.connection_config.get('aws_access_key_id'),
+            aws_secret_access_key=self.connection_config.get('aws_secret_access_key')
         )
+        credentials = aws_session.get_credentials().get_frozen_credentials()
+
+        self.s3 = aws_session.client('s3')
+        
+        # Explicitly set credentials to those fetched from Boto so we can re-use them in COPY SQL if necessary
+        self.connection_config['aws_access_key_id'] = credentials.access_key
+        self.connection_config['aws_secret_access_key'] = credentials.secret_key
 
         # Set further properties by singer SCHEMA message
         if self.stream_schema_message is not None:
@@ -337,7 +341,7 @@ class DbSync:
     def put_to_s3(self, file, stream, count):
         logger.info("Uploading {} rows to S3".format(count))
 
-        # Generating key in S3 bucket 
+        # Generating key in S3 bucket
         bucket = self.connection_config['s3_bucket']
         s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
         s3_key = "{}pipelinewise_{}_{}.csv".format(s3_key_prefix, stream, datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f"))
@@ -374,27 +378,36 @@ class DbSync:
                 cur.execute(self.drop_table_query(is_stage=True))
                 cur.execute(self.create_table_query(is_stage=True))
 
-                # Step 2: Generate copy options - Override defaults from config.json if defined
+                # Step 2: Generate copy credentials - prefer role if provided, otherwise use access and secret keys
+                copy_credentials = """
+                    iam_role '{aws_role_arn}'
+                """.format(aws_role_arn=self.connection_config['aws_redshift_copy_role_arn']) if "aws_redshift_copy_role_arn" in self.connection_config else """
+                    ACCESS_KEY_ID '{aws_access_key_id}'
+                    SECRET_ACCESS_KEY '{aws_secret_access_key}'
+                """.format(
+                    aws_access_key_id=self.connection_config['aws_access_key_id'],
+                    aws_secret_access_key=self.connection_config['aws_secret_access_key'],
+                )
+
+                # Step 3: Generate copy options - Override defaults from config.json if defined
                 copy_options = self.connection_config.get('copy_options',"""
                     EMPTYASNULL BLANKSASNULL TRIMBLANKS TRUNCATECOLUMNS
                     TIMEFORMAT 'auto'
                     COMPUPDATE OFF STATUPDATE OFF
                 """)
 
-                # Step 2: Load into the stage table
-                copy_sql = """COPY {} ({}) FROM 's3://{}/{}'
-                    ACCESS_KEY_ID '{}'
-                    SECRET_ACCESS_KEY '{}'
-                    {}
+                # Step 4: Load into the stage table
+                copy_sql = """COPY {table} ({columns}) FROM 's3://{s3_bucket}/{s3_key}'
+                    {copy_credentials}
+                    {copy_options}
                     DELIMITER ',' REMOVEQUOTES ESCAPE
                 """.format(
-                    self.stage_table,
-                    ', '.join([c['name'] for c in columns_with_trans]),
-                    self.connection_config['s3_bucket'],
-                    s3_key,
-                    self.connection_config['aws_access_key_id'],
-                    self.connection_config['aws_secret_access_key'],
-                    copy_options
+                    table=self.stage_table,
+                    columns=', '.join([c['name'] for c in columns_with_trans]),
+                    s3_bucket=self.connection_config['s3_bucket'],
+                    s3_key=s3_key,
+                    copy_credentials=copy_credentials,
+                    copy_options=copy_options
                 )
                 logger.debug("REDSHIFT - {}".format(copy_sql))
                 cur.execute(copy_sql)
@@ -645,4 +658,3 @@ class DbSync:
         else:
             logger.info("Table '{}' exists".format(self.target_table))
             self.update_columns(table_columns_cache)
-
