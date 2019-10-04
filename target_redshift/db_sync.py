@@ -220,7 +220,7 @@ class DbSync:
         credentials = aws_session.get_credentials().get_frozen_credentials()
 
         self.s3 = aws_session.client('s3')
-        
+
         # Explicitly set credentials to those fetched from Boto so we can re-use them in COPY SQL if necessary
         self.connection_config['aws_access_key_id'] = credentials.access_key
         self.connection_config['aws_secret_access_key'] = credentials.secret_key
@@ -381,7 +381,7 @@ class DbSync:
                 # Step 2: Generate copy credentials - prefer role if provided, otherwise use access and secret keys
                 copy_credentials = """
                     iam_role '{aws_role_arn}'
-                """.format(aws_role_arn=self.connection_config['aws_redshift_copy_role_arn']) if "aws_redshift_copy_role_arn" in self.connection_config else """
+                """.format(aws_role_arn=self.connection_config['aws_redshift_copy_role_arn']) if self.connection_config.get("aws_redshift_copy_role_arn") else """
                     ACCESS_KEY_ID '{aws_access_key_id}'
                     SECRET_ACCESS_KEY '{aws_secret_access_key}'
                 """.format(
