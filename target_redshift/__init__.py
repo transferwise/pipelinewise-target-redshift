@@ -2,30 +2,26 @@
 
 import argparse
 import io
+import json
 import os
 import sys
-import json
-import threading
-import http.client
-import urllib
-from datetime import datetime
-import time
-import collections
-from tempfile import NamedTemporaryFile
-from decimal import Decimal
-from joblib import Parallel, delayed, parallel_backend
 import tempfile
+from datetime import datetime
+from decimal import Decimal
+from tempfile import NamedTemporaryFile
 
-import pkg_resources
-from jsonschema import ValidationError, Draft4Validator, FormatChecker
 import singer
+from joblib import Parallel, delayed, parallel_backend
+from jsonschema import Draft4Validator, FormatChecker
+
 from target_redshift.db_sync import DbSync
 
 logger = singer.get_logger()
 
+
 def float_to_decimal(value):
-    '''Walk the given data structure and turn all instances of float into
-    double.'''
+    """Walk the given data structure and turn all instances of float into
+    double."""
     if isinstance(value, float):
         return Decimal(str(value))
     if isinstance(value, list):
@@ -34,6 +30,7 @@ def float_to_decimal(value):
         return {k: float_to_decimal(v) for k, v in value.items()}
     return value
 
+
 def add_metadata_columns_to_schema(schema_message):
     """Metadata _sdc columns according to the stitch documentation at
     https://www.stitchdata.com/docs/data-structure/integration-schemas#sdc-columns
@@ -41,11 +38,14 @@ def add_metadata_columns_to_schema(schema_message):
     Metadata columns gives information about data injections
     """
     extended_schema_message = schema_message
-    extended_schema_message['schema']['properties']['_sdc_extracted_at'] = { 'type': ['null', 'string'], 'format': 'date-time' }
-    extended_schema_message['schema']['properties']['_sdc_batched_at'] = { 'type': ['null', 'string'], 'format': 'date-time' }
-    extended_schema_message['schema']['properties']['_sdc_deleted_at'] = { 'type': ['null', 'string'] }
+    extended_schema_message['schema']['properties']['_sdc_extracted_at'] = {'type': ['null', 'string'],
+                                                                            'format': 'date-time'}
+    extended_schema_message['schema']['properties']['_sdc_batched_at'] = {'type': ['null', 'string'],
+                                                                          'format': 'date-time'}
+    extended_schema_message['schema']['properties']['_sdc_deleted_at'] = {'type': ['null', 'string']}
 
     return extended_schema_message
+
 
 def add_metadata_values_to_record(record_message, stream_to_sync):
     """Populate metadata _sdc columns from incoming record message
@@ -58,12 +58,14 @@ def add_metadata_values_to_record(record_message, stream_to_sync):
 
     return extended_record
 
+
 def emit_state(state):
     if state is not None:
         line = json.dumps(state)
         logger.debug('Emitting state {}'.format(line))
         sys.stdout.write("{}\n".format(line))
         sys.stdout.flush()
+
 
 def get_schema_names_from_config(config):
     default_target_schema = config.get('default_target_schema')
@@ -78,6 +80,7 @@ def get_schema_names_from_config(config):
             schema_names.append(target.get('target_schema'))
 
     return schema_names
+
 
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements
 def persist_lines(config, lines):
@@ -127,8 +130,9 @@ def persist_lines(config, lines):
                 validators[stream].validate(float_to_decimal(o['record']))
             except Exception as ex:
                 if type(ex).__name__ == "InvalidOperation":
-                    logger.error("Data validation failed and cannot load to destination. RECORD: {}\n'multipleOf' validations that allows long precisions are not supported (i.e. with 15 digits or more). Try removing 'multipleOf' methods from JSON schema."
-                    .format(o['record']))
+                    logger.error(
+                        "Data validation failed and cannot load to destination. RECORD: {}\n'multipleOf' validations that allows long precisions are not supported (i.e. with 15 digits or more). Try removing 'multipleOf' methods from JSON schema."
+                        .format(o['record']))
                     raise ex
 
             primary_key_string = stream_to_sync[stream].record_primary_key_string(o['record'])
@@ -200,7 +204,6 @@ def persist_lines(config, lines):
             raise Exception("Unknown message type {} in message {}"
                             .format(o['type'], o))
 
-
     # Single-host, thread-based parallelism
     with parallel_backend('threading', n_jobs=parallelism):
         Parallel()(delayed(load_stream_batch)(
@@ -215,7 +218,7 @@ def persist_lines(config, lines):
 
 
 def load_stream_batch(stream, records_to_load, row_count, db_sync, delete_rows=False):
-    #Load into redshift
+    # Load into redshift
     if row_count > 0:
         flush_records(stream, records_to_load, row_count, db_sync)
 
