@@ -164,6 +164,11 @@ class TestTargetRedshift(object):
             self.assert_metadata_columns_not_exist(table_two)
             self.assert_metadata_columns_not_exist(table_three)
 
+    #################################
+    #           TESTS               #
+    #################################
+
+
     def test_invalid_json(self):
         """Receiving invalid JSONs should raise an exception"""
         tap_lines = test_utils.get_test_tap_lines("invalid-json.json")
@@ -203,7 +208,7 @@ class TestTargetRedshift(object):
         """Loading multiple tables from the same input tap with various columns types"""
         tap_lines = test_utils.get_test_tap_lines("messages-with-three-streams.json")
 
-        # Turning on adding metadata columns
+        # Using fixed 1 thread parallelism
         self.config["parallelism"] = 1
         target_redshift.persist_lines(self.config, tap_lines)
 
@@ -252,31 +257,12 @@ class TestTargetRedshift(object):
 
         assert self.remove_metadata_columns_from_rows(table_unicode) == [
             {"c_int": 1, "c_pk": 1, "c_varchar": "Hello world, Καλημέρα κόσμε, コンニチハ"},
-            {
-                "c_int": 2,
-                "c_pk": 2,
-                "c_varchar": "Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.",
-            },
-            {
-                "c_int": 3,
-                "c_pk": 3,
-                "c_varchar": "Russian: Зарегистрируйтесь сейчас на Десятую Международную Конференцию по",
-            },
-            {
-                "c_int": 4,
-                "c_pk": 4,
-                "c_varchar": "Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช",
-            },
-            {
-                "c_int": 5,
-                "c_pk": 5,
-                "c_varchar": "Arabic: لقد لعبت أنت وأصدقاؤك لمدة وحصلتم علي من إجمالي النقاط",
-            },
-            {
-                "c_int": 6,
-                "c_pk": 6,
-                "c_varchar": "Special Characters: [\"\\,'!@£$%^&*()]\\\\",
-            },
+            {"c_int": 2, "c_pk": 2, "c_varchar": "Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年."},
+            {"c_int": 3, "c_pk": 3, "c_varchar":
+                "Russian: Зарегистрируйтесь сейчас на Десятую Международную Конференцию по"},
+            {"c_int": 4, "c_pk": 4, "c_varchar": "Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช"},
+            {"c_int": 5, "c_pk": 5, "c_varchar": "Arabic: لقد لعبت أنت وأصدقاؤك لمدة وحصلتم علي من إجمالي النقاط"},
+            {"c_int": 6, "c_pk": 6, "c_varchar": "Special Characters: [\"\\,'!@£$%^&*()]\\\\"},
         ]
 
     def test_loading_long_text(self):
@@ -352,31 +338,11 @@ class TestTargetRedshift(object):
         assert self.remove_metadata_columns_from_rows(
             table_non_db_friendly_columns
         ) == [
-            {
-                "c_pk": 1,
-                "camelcasecolumn": "Dummy row 1",
-                "minus-column": "Dummy row 1",
-            },
-            {
-                "c_pk": 2,
-                "camelcasecolumn": "Dummy row 2",
-                "minus-column": "Dummy row 2",
-            },
-            {
-                "c_pk": 3,
-                "camelcasecolumn": "Dummy row 3",
-                "minus-column": "Dummy row 3",
-            },
-            {
-                "c_pk": 4,
-                "camelcasecolumn": "Dummy row 4",
-                "minus-column": "Dummy row 4",
-            },
-            {
-                "c_pk": 5,
-                "camelcasecolumn": "Dummy row 5",
-                "minus-column": "Dummy row 5",
-            },
+            {"c_pk": 1, "camelcasecolumn": "Dummy row 1", "minus-column": "Dummy row 1"},
+            {"c_pk": 2, "camelcasecolumn": "Dummy row 2", "minus-column": "Dummy row 2"},
+            {"c_pk": 3, "camelcasecolumn": "Dummy row 3", "minus-column": "Dummy row 3"},
+            {"c_pk": 4, "camelcasecolumn": "Dummy row 4", "minus-column": "Dummy row 4"},
+            {"c_pk": 5, "camelcasecolumn": "Dummy row 5", "minus-column": "Dummy row 5"},
         ]
 
     def test_nested_schema_unflattening(self):
