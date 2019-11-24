@@ -24,6 +24,14 @@ setup(name="pipelinewise-target-redshift",
           'inflection==0.3.1',
           'joblib==0.13.2'
       ],
+      extras_require={
+          "test": [
+                "pylint==2.4.2",
+                "pytest==5.3.0",
+                "mock==3.0.5",
+                "coverage==4.5.4"
+            ]
+      },
       entry_points="""
           [console_scripts]
           target-redshift=target_redshift:main

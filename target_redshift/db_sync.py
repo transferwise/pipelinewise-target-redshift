@@ -1,5 +1,6 @@
 import os
 import json
+import sys
 import psycopg2
 import psycopg2.extras
 import boto3
@@ -103,7 +104,7 @@ def column_clause(name, schema_property):
 
 def flatten_key(k, parent_key, sep):
     full_key = parent_key + [k]
-    inflected_key = [n for n in full_key]
+    inflected_key = full_key.copy()
     reducer_index = 0
     while len(sep.join(inflected_key)) >= 127 and reducer_index < len(inflected_key):
         reduced_key = re.sub(r'[a-z]', '', inflection.camelize(inflected_key[reducer_index]))
@@ -206,7 +207,7 @@ class DbSync:
         config_errors = validate_config(connection_config)
         if len(config_errors) != 0:
             logger.error("Invalid configuration:\n   * {}".format('\n   * '.join(config_errors)))
-            exit(1)
+            sys.exit(1)
 
         # Set basic properties
         self.connection_config = connection_config
