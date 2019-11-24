@@ -13,7 +13,12 @@ jobs:
             . venv/bin/activate
             pip install --upgrade pip
             pip install .
-            pip install pylint pytest coverage
+
+      - run:
+          name: 'Pylinting'
+          command: |
+            . venv/bin/activate
+            pip install .[test]
             pylint target_redshift -d C,W,unexpected-keyword-arg,duplicate-code
    
       - run:
