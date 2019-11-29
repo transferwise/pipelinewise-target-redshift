@@ -18,7 +18,7 @@ METADATA_COLUMNS = ["_sdc_extracted_at", "_sdc_batched_at", "_sdc_deleted_at"]
 
 class TestTargetRedshift(object):
     """
-    UnIntegrationit Tests for PipelineWise Target Redshift
+    Integration Tests for PipelineWise Target Redshift
     """
 
     def setup_method(self):
@@ -294,6 +294,15 @@ class TestTargetRedshift(object):
 
         # Using fixed 1 thread parallelism
         self.config["parallelism"] = 1
+        target_redshift.persist_lines(self.config, tap_lines)
+
+        self.assert_three_streams_are_loaded_in_redshift()
+
+    def test_loading_tables_with_defined_slice_number(self):
+        """Loading multiple tables from the same input tap with various columns types with a defined slice number"""
+        tap_lines = test_utils.get_test_tap_lines("messages-with-three-streams.json")
+
+        self.config["slices"] = 4
         target_redshift.persist_lines(self.config, tap_lines)
 
         self.assert_three_streams_are_loaded_in_redshift()

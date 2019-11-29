@@ -340,13 +340,13 @@ class DbSync:
         )
 
 
-    def put_to_s3(self, file, stream, count):
+    def put_to_s3(self, file, stream, count, suffix = ""):
         logger.info("Uploading {} rows to S3".format(count))
 
         # Generating key in S3 bucket
         bucket = self.connection_config['s3_bucket']
         s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
-        s3_key = "{}pipelinewise_{}_{}.csv".format(s3_key_prefix, stream, datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f"))
+        s3_key = "{}pipelinewise_{}{}".format(s3_key_prefix, stream, suffix)
 
         logger.info("Target S3 bucket: {}, local file: {}, S3 key: {}".format(bucket, file, s3_key))
 
@@ -411,7 +411,7 @@ class DbSync:
                     s3_bucket=self.connection_config['s3_bucket'],
                     s3_key=s3_key,
                     copy_credentials=copy_credentials,
-                    copy_options=copy_options
+                    copy_options=copy_options,
                 )
                 logger.debug("REDSHIFT - {}".format(copy_sql))
                 cur.execute(copy_sql)
