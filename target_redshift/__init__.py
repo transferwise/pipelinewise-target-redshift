@@ -6,6 +6,8 @@ import json
 import os
 import sys
 import copy
+import gzip
+import bz2
 from datetime import datetime
 from decimal import Decimal
 from tempfile import NamedTemporaryFile, mkstemp
@@ -342,7 +344,6 @@ def load_stream_batch(config, stream, records_to_load, row_count, db_sync, delet
         row_count[stream] = 0
 
 
-
 def chunk_iterable(iterable, size):
     """Yield successive n-sized chunks from iterable. The last chunk is not padded"""
     iterable = iter(iterable)
@@ -355,7 +356,19 @@ def ceiling_division(n, d):
 
 
 def flush_records(config, stream, records_to_load, row_count, db_sync):
+    compression = config.get("compression", "")
+    use_gzip = compression == "gzip"
+    use_bzip2 = compression == "bzip2"
+
+    open_method = open
     file_extension = ".csv"
+    if use_gzip:
+        open_method = gzip.open
+        file_extension = file_extension + ".gz"
+    elif use_bzip2:
+        open_method = bz2.open
+        file_extension = file_extension + ".bz2"
+
     try:
         slices = int(config.get("slices", 1))
     except Exception as err:
@@ -375,7 +388,7 @@ def flush_records(config, stream, records_to_load, row_count, db_sync):
     for chunk_number, chunk in enumerate(chunks, start=1):
         _, csv_file = mkstemp(suffix=file_extension + "." + str(chunk_number))
         csv_files = csv_files + [csv_file]
-        with open(csv_file, "w+b") as csv_f:
+        with open_method(csv_file, "w+b") as csv_f:
             for record in chunk:
                 csv_line = db_sync.record_to_csv_line(record)
                 csv_f.write(bytes(csv_line + "\n", "UTF-8"))
@@ -390,7 +403,7 @@ def flush_records(config, stream, records_to_load, row_count, db_sync):
     # the copy key is the filename prefix without the chunk number
     copy_key = os.path.splitext(s3_keys[0])[0]
 
-    db_sync.load_csv(copy_key, row_count)
+    db_sync.load_csv(copy_key, row_count, compression)
     for csv_file in csv_files:
         os.remove(csv_file)
     for s3_key in s3_keys:

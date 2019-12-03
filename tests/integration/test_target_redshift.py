@@ -307,6 +307,24 @@ class TestTargetRedshift(object):
 
         self.assert_three_streams_are_loaded_in_redshift()
 
+    def test_loading_tables_with_gzip_compression(self):
+        """Loading multiple tables from the same input tap with various columns types and gzip compression"""
+        tap_lines = test_utils.get_test_tap_lines("messages-with-three-streams.json")
+
+        self.config["compression"] = "gzip"
+        target_redshift.persist_lines(self.config, tap_lines)
+
+        self.assert_three_streams_are_loaded_in_redshift()
+
+    def test_loading_tables_with_bz2_compression(self):
+        """Loading multiple tables from the same input tap with various columns types and bz2 compression"""
+        tap_lines = test_utils.get_test_tap_lines("messages-with-three-streams.json")
+
+        self.config["compression"] = "bz2"
+        target_redshift.persist_lines(self.config, tap_lines)
+
+        self.assert_three_streams_are_loaded_in_redshift()
+
     def test_loading_tables_with_hard_delete(self):
         """Loading multiple tables from the same input tap with deleted rows"""
         tap_lines = test_utils.get_test_tap_lines("messages-with-three-streams.json")
