@@ -299,6 +299,7 @@ def flush_streams(
     # Single-host, thread-based parallelism
     with parallel_backend('threading', n_jobs=parallelism):
         Parallel()(delayed(load_stream_batch)(
+            config=config,
             stream=stream,
             records_to_load=streams[stream],
             row_count=row_count,
@@ -328,10 +329,10 @@ def flush_streams(
     return flushed_state
 
 
-def load_stream_batch(stream, records_to_load, row_count, db_sync, delete_rows=False):
+def load_stream_batch(config, stream, records_to_load, row_count, db_sync, delete_rows=False):
     # Load into redshift
     if row_count[stream] > 0:
-        flush_records(stream, records_to_load, row_count[stream], db_sync)
+        flush_records(config, stream, records_to_load, row_count[stream], db_sync)
 
         # Delete soft-deleted, flagged rows - where _sdc_deleted at is not null
         if delete_rows:
