@@ -107,8 +107,7 @@ Full list of options in `config.json`:
   python3 -m venv venv
   . venv/bin/activate
   pip install --upgrade pip
-  pip install .
-  pip install pytest coverage
+  pip install .[test]
 ```
 
 1. To run unit tests:
@@ -144,7 +143,7 @@ Full list of options in `config.json`:
   python3 -m venv venv
   . venv/bin/activate
   pip install --upgrade pip
-  pip install .
+  pip install .[test]
   pip install pylint
   pylint target_redshift -d C,W,unexpected-keyword-arg,duplicate-code
 ```
