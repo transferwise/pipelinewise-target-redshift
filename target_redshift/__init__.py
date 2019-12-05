@@ -13,6 +13,7 @@ from tempfile import NamedTemporaryFile, mkstemp
 import singer
 from joblib import Parallel, delayed, parallel_backend
 from jsonschema import Draft4Validator, FormatChecker
+from itertools import islice
 
 from target_redshift.db_sync import DbSync
 
@@ -298,6 +299,7 @@ def flush_streams(
     # Single-host, thread-based parallelism
     with parallel_backend('threading', n_jobs=parallelism):
         Parallel()(delayed(load_stream_batch)(
+            config=config,
             stream=stream,
             records_to_load=streams[stream],
             row_count=row_count,
@@ -327,10 +329,10 @@ def flush_streams(
     return flushed_state
 
 
-def load_stream_batch(stream, records_to_load, row_count, db_sync, delete_rows=False):
+def load_stream_batch(config, stream, records_to_load, row_count, db_sync, delete_rows=False):
     # Load into redshift
     if row_count[stream] > 0:
-        flush_records(stream, records_to_load, row_count[stream], db_sync)
+        flush_records(config, stream, records_to_load, row_count[stream], db_sync)
 
         # Delete soft-deleted, flagged rows - where _sdc_deleted at is not null
         if delete_rows:
@@ -340,17 +342,60 @@ def load_stream_batch(stream, records_to_load, row_count, db_sync, delete_rows=F
         row_count[stream] = 0
 
 
-def flush_records(stream, records_to_load, row_count, db_sync):
-    csv_fd, csv_file = mkstemp()
-    with open(csv_fd, 'w+b') as f:
-        for record in records_to_load.values():
-            csv_line = db_sync.record_to_csv_line(record)
-            f.write(bytes(csv_line + '\n', 'UTF-8'))
 
-    s3_key = db_sync.put_to_s3(csv_file, stream, row_count)
-    db_sync.load_csv(s3_key, row_count)
-    os.remove(csv_file)
-    db_sync.delete_from_s3(s3_key)
+def chunk_iterable(iterable, size):
+    """Yield successive n-sized chunks from iterable. The last chunk is not padded"""
+    iterable = iter(iterable)
+    return iter(lambda: tuple(islice(iterable, size)), ())
+
+
+def ceiling_division(n, d):
+    """Returns integer ceiling division of n / d"""
+    return -(n // -d)
+
+
+def flush_records(config, stream, records_to_load, row_count, db_sync):
+    file_extension = ".csv"
+    try:
+        slices = int(config.get("slices", 1))
+    except Exception as err:
+        logger.error("The provided configuration value 'slices' was not an integer")
+        raise err
+
+    csv_files = []
+    s3_keys = []
+
+    date_suffix = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+
+    # chunk files by the 'slices' config parameter in order to optimise Redshift COPY loading
+    # see https://docs.aws.amazon.com/redshift/latest/dg/c_best-practices-use-multiple-files.html
+    chunks = chunk_iterable(
+        list(records_to_load.values()), ceiling_division(len(records_to_load), slices)
+    )
+    for chunk_number, chunk in enumerate(chunks, start=1):
+        _, csv_file = mkstemp(suffix=file_extension + "." + str(chunk_number))
+        csv_files = csv_files + [csv_file]
+        with open(csv_file, "w+b") as csv_f:
+            for record in chunk:
+                csv_line = db_sync.record_to_csv_line(record)
+                csv_f.write(bytes(csv_line + "\n", "UTF-8"))
+        s3_key = db_sync.put_to_s3(
+            csv_file,
+            stream,
+            len(chunk),
+            suffix="_" + date_suffix + file_extension + "." + str(chunk_number),
+        )
+        s3_keys = s3_keys + [s3_key]
+
+    # the copy key is the filename prefix without the chunk number
+    copy_key = os.path.splitext(s3_keys[0])[0]
+
+    db_sync.load_csv(copy_key, row_count)
+    for csv_file in csv_files:
+        os.remove(csv_file)
+    for s3_key in s3_keys:
+        db_sync.delete_from_s3(s3_key)
+
 
 
 def main():
