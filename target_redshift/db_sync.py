@@ -213,12 +213,21 @@ class DbSync:
         self.connection_config = connection_config
         self.stream_schema_message = stream_schema_message
 
+        aws_access_key_id=self.connection_config.get('aws_access_key_id')
+        aws_secret_access_key=self.connection_config.get('aws_secret_access_key')
+        aws_session_token=self.connection_config.get('aws_session_token')
+
         # Init S3 client
-        aws_session = boto3.session.Session(
-            aws_access_key_id=self.connection_config.get('aws_access_key_id'),
-            aws_secret_access_key=self.connection_config.get('aws_secret_access_key'),
-            aws_session_token=self.connection_config.get('aws_session_token'),
-        )
+        # Conditionally pass keys as this seems to affect whether instance credentials are correctly loaded if the keys are None
+        if aws_access_key_id and aws_secret_access_key:
+            aws_session = boto3.session.Session(
+                aws_access_key_id=aws_access_key_id,
+                aws_secret_access_key=aws_secret_access_key,
+                aws_session_token=aws_session_token
+            )
+        else:
+            aws_session = boto3.session.Session()
+
         credentials = aws_session.get_credentials().get_frozen_credentials()
 
         self.s3 = aws_session.client('s3')
