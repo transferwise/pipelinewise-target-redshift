@@ -1,3 +1,10 @@
+1.2.0 (2019-12-05)
+-------------------
+
+- Add `slices` option
+- Add `compression` option
+- Fixed an issue when ECS credentials not being correctly picked up by boto3 when no keys are provided
+
 1.1.0 (2019-11-24)
 -------------------
 
