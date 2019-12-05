@@ -305,8 +305,7 @@ def flush_streams(
             stream=stream,
             records_to_load=streams[stream],
             row_count=row_count,
-            db_sync=stream_to_sync[stream],
-            delete_rows=config.get('hard_delete')
+            db_sync=stream_to_sync[stream]
         ) for (stream) in streams_to_flush)
 
     # reset flushed stream records to empty to avoid flushing same records
@@ -331,7 +330,9 @@ def flush_streams(
     return flushed_state
 
 
-def load_stream_batch(config, stream, records_to_load, row_count, db_sync, delete_rows=False):
+def load_stream_batch(config, stream, records_to_load, row_count, db_sync):
+    delete_rows = config.get('hard_delete', False)
+
     # Load into redshift
     if row_count[stream] > 0:
         flush_records(config, stream, records_to_load, row_count[stream], db_sync)
