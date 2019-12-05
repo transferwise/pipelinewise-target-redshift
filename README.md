@@ -96,8 +96,7 @@ Full list of options in `config.json`:
 | data_flattening_max_level           | Integer |            | (Default: 0) Object type RECORD items from taps can be loaded into VARIANT columns as JSON (default) or we can flatten the schema by creating columns automatically.<br><br>When value is 0 (default) then flattening functionality is turned off. |
 | primary_key_required                | Boolean |            | (Default: True) Log based and Incremental replications on tables with no Primary Key cause duplicates when merging UPDATE events. When set to true, stop loading data if no Primary Key is defined. |
 | compression                         | String  |    No        | The compression method to use when writing files to S3 and running Redshift `COPY`. The currently supported methods are `gzip` or `bzip2`. Defaults to none (`""`). |
-| slices                              | Integer |    No      | The number of slices to split files into prior to running COPY on Redshift. This should be set to the number of Redshift slices.
-The number of slices per node depends on the node size of the cluster - run `SELECT COUNT(DISTINCT slice) slices FROM stv_slices` to calculate this. Defaults to `1`. |
+| slices                              | Integer |    No      | The number of slices to split files into prior to running COPY on Redshift. This should be set to the number of Redshift slices. The number of slices per node depends on the node size of the cluster - run `SELECT COUNT(DISTINCT slice) slices FROM stv_slices` to calculate this. Defaults to `1`. |
 
 ### To run tests:
 
