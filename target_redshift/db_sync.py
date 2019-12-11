@@ -1,16 +1,18 @@
-import os
+import collections
+import datetime
+import itertools
 import json
+import os
+import re
 import sys
+import time
+
+import boto3
 import psycopg2
 import psycopg2.extras
-import boto3
-import singer
-import collections
+
 import inflection
-import re
-import itertools
-import time
-import datetime
+import singer
 
 logger = singer.get_logger()
 
@@ -225,16 +227,15 @@ class DbSync:
                 aws_secret_access_key=aws_secret_access_key,
                 aws_session_token=aws_session_token
             )
+            credentials = aws_session.get_credentials().get_frozen_credentials()
+
+            # Explicitly set credentials to those fetched from Boto so we can re-use them in COPY SQL if necessary
+            self.connection_config['aws_access_key_id'] = credentials.access_key
+            self.connection_config['aws_secret_access_key'] = credentials.secret_key
         else:
             aws_session = boto3.session.Session()
 
-        credentials = aws_session.get_credentials().get_frozen_credentials()
-
         self.s3 = aws_session.client('s3')
-
-        # Explicitly set credentials to those fetched from Boto so we can re-use them in COPY SQL if necessary
-        self.connection_config['aws_access_key_id'] = credentials.access_key
-        self.connection_config['aws_secret_access_key'] = credentials.secret_key
 
         # Set further properties by singer SCHEMA message
         if self.stream_schema_message is not None:
