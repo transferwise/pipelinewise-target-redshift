@@ -1,16 +1,18 @@
-import os
+import collections
+import datetime
+import itertools
 import json
+import os
+import re
 import sys
+import time
+
+import boto3
 import psycopg2
 import psycopg2.extras
-import boto3
-import singer
-import collections
+
 import inflection
-import re
-import itertools
-import time
-import datetime
+import singer
 
 logger = singer.get_logger()
 
@@ -213,9 +215,9 @@ class DbSync:
         self.connection_config = connection_config
         self.stream_schema_message = stream_schema_message
 
-        aws_access_key_id=self.connection_config.get('aws_access_key_id')
-        aws_secret_access_key=self.connection_config.get('aws_secret_access_key')
-        aws_session_token=self.connection_config.get('aws_session_token')
+        aws_access_key_id = self.connection_config.get('aws_access_key_id') or os.environ.get('AWS_ACCESS_KEY_ID')
+        aws_secret_access_key = self.connection_config.get('aws_secret_access_key') or os.environ.get('AWS_SECRET_ACCESS_KEY')
+        aws_session_token = self.connection_config.get('aws_session_token') or os.environ.get('AWS_SESSION_TOKEN')
 
         # Init S3 client
         # Conditionally pass keys as this seems to affect whether instance credentials are correctly loaded if the keys are None
@@ -225,16 +227,16 @@ class DbSync:
                 aws_secret_access_key=aws_secret_access_key,
                 aws_session_token=aws_session_token
             )
+            credentials = aws_session.get_credentials().get_frozen_credentials()
+
+            # Explicitly set credentials to those fetched from Boto so we can re-use them in COPY SQL if necessary
+            self.connection_config['aws_access_key_id'] = credentials.access_key
+            self.connection_config['aws_secret_access_key'] = credentials.secret_key
+            self.connection_config['aws_session_token'] = credentials.token
         else:
             aws_session = boto3.session.Session()
 
-        credentials = aws_session.get_credentials().get_frozen_credentials()
-
         self.s3 = aws_session.client('s3')
-
-        # Explicitly set credentials to those fetched from Boto so we can re-use them in COPY SQL if necessary
-        self.connection_config['aws_access_key_id'] = credentials.access_key
-        self.connection_config['aws_secret_access_key'] = credentials.secret_key
 
         # Set further properties by singer SCHEMA message
         if self.stream_schema_message is not None:
