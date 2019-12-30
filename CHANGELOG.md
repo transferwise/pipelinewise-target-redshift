@@ -1,3 +1,8 @@
+1.2.1 (2019-12-30)
+-------------------
+
+- Fixed an issue when AWS credentials are not collected correctly from AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables
+
 1.2.0 (2019-12-05)
 -------------------
 
