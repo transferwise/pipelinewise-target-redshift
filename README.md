@@ -76,9 +76,9 @@ Full list of options in `config.json`:
 | user                                | String  | Yes        | Redshift User                                                 |
 | password                            | String  | Yes        | Redshift Password                                             |
 | dbname                              | String  | Yes        | Redshift Database name                                        |
-| aws_access_key_id                   | String  | No         | S3 Access Key Id. Used for S3 and Redshfit copy operations. If not provided, credentials will be collected from the environment                                              |
-| aws_secret_access_key               | String  | No         | S3 Secret Access Key. Used for S3 and Redshfit copy operations. If not provided, credentials will be collected from the environment                                          |
-| aws_session_token                   | String  | No         | S3 AWS STS token for temporary credentials                |
+| aws_access_key_id                   | String  | No         | S3 Access Key Id. Used for S3 and Redshfit copy operations. If not provided, credentials will be collected from the `AWS_ACCESS_KEY_ID` environment variable      |
+| aws_secret_access_key               | String  | No         | S3 Secret Access Key. Used for S3 and Redshfit copy operations. If not provided, credentials will be collected from the `AWS_SECRET_ACCESS_KEY` environment variable    |
+| aws_session_token                   | String  | No         | S3 AWS STS token for temporary credentials. If not provided, credentials will be collected from the `AWS_SESSION_TOKEN` environment variable              |
 | aws_redshift_copy_role_arn          | String  | No         | AWS Role ARN to be used for the Redshift COPY operation. Used instead of the given AWS keys for the COPY operation if provided - the keys are still used for other S3 operations |
 | s3_bucket                           | String  | Yes        | S3 Bucket name                                                |
 | s3_key_prefix                       | String  |            | (Default: None) A static prefix before the generated S3 key names. Using prefixes you can upload files into specific directories in the S3 bucket. |
