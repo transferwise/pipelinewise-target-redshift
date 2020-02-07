@@ -3,7 +3,7 @@
 from setuptools import setup
 
 with open('README.md') as f:
-      long_description = f.read()
+    long_description = f.read()
 
 setup(name="pipelinewise-target-redshift",
       version="1.2.1",
@@ -18,7 +18,7 @@ setup(name="pipelinewise-target-redshift",
       ],
       py_modules=["target_redshift"],
       install_requires=[
-          'singer-python==5.7.0',
+          'pipelinewise-singer-python==1.*',
           'boto3==1.9.188',
           'psycopg2==2.7.7',
           'inflection==0.3.1',

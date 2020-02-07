@@ -19,7 +19,7 @@ from itertools import islice
 
 from target_redshift.db_sync import DbSync
 
-logger = singer.get_logger()
+logger = singer.get_logger('target_redshift')
 
 DEFAULT_BATCH_SIZE_ROWS = 100000
 DEFAULT_PARALLELISM = 0  # 0 The number of threads used to flush tables

@@ -14,7 +14,7 @@ import psycopg2.extras
 import inflection
 import singer
 
-logger = singer.get_logger()
+logger = singer.get_logger('target_redshift')
 
 DEFAULT_VARCHAR_LENGTH = 10000
 SHORT_VARCHAR_LENGTH = 256
