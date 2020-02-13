@@ -12,19 +12,19 @@ jobs:
             python3 -m venv venv
             . venv/bin/activate
             pip install --upgrade pip
-            pip install .
+            pip install .[test]
 
       - run:
           name: 'Pylinting'
           command: |
             . venv/bin/activate
-            pip install .[test]
             pylint target_redshift -d C,W,unexpected-keyword-arg,duplicate-code
    
       - run:
           name: 'Unit and Integration Tests and Coverage'
           command: |
             . venv/bin/activate
+            export LOGGING_CONF_FILE=./sample_logging.conf
             coverage run -m pytest --disable-pytest-warnings tests
             coverage report
             coverage html -d coverage_html
