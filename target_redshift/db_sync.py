@@ -237,6 +237,7 @@ class DbSync:
             aws_session = boto3.session.Session()
 
         self.s3 = aws_session.client('s3')
+        self.skip_updates = self.connection_config.get('skip_updates', False)
 
         # Set further properties by singer SCHEMA message
         if self.stream_schema_message is not None:
@@ -454,20 +455,20 @@ class DbSync:
                     )
                     logger.debug("REDSHIFT - {}".format(insert_sql))
                     cur.execute(insert_sql)
-
                     # Step 3/a/2: Update existing records
-                    update_sql = """UPDATE {}
-                        SET {}
-                        FROM {} s
-                        WHERE {}
-                    """.format(
-                        self.target_table,
-                        ', '.join(['{} = s.{}'.format(c['name'], c['name']) for c in columns_with_trans]),
-                        self.stage_table,
-                        self.primary_key_merge_condition()
-                    )
-                    logger.debug("REDSHIFT - {}".format(update_sql))
-                    cur.execute(update_sql)
+                    if not self.skip_updates:
+                        update_sql = """UPDATE {}
+                            SET {}
+                            FROM {} s
+                            WHERE {}
+                        """.format(
+                            self.target_table,
+                            ', '.join(['{} = s.{}'.format(c['name'], c['name']) for c in columns_with_trans]),
+                            self.stage_table,
+                            self.primary_key_merge_condition()
+                        )
+                        logger.info("REDSHIFT - {}".format(update_sql))
+                        cur.execute(update_sql)
 
                 # Step 3/b: Insert only if no primary key
                 else:
