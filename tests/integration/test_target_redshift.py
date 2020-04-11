@@ -63,9 +63,11 @@ class TestTargetRedshift(object):
             for md_c in METADATA_COLUMNS:
                 assert md_c not in r
 
-    def assert_three_streams_are_loaded_in_redshift(
-        self, should_metadata_columns_exist=False, should_hard_deleted_rows=False
-    ):
+    def assert_three_streams_are_loaded_in_redshift(self,
+                                                    should_metadata_columns_exist=False,
+                                                    should_hard_deleted_rows=False,
+                                                    should_primary_key_required=True,
+                                                    should_skip_updates=False):
         """
         This is a helper assertion that checks if every data from the message-with-three-streams.json
         file is available in Redshift tables correctly.
@@ -101,7 +103,7 @@ class TestTargetRedshift(object):
         assert self.remove_metadata_columns_from_rows(table_one) == expected_table_one
 
         # ----------------------------------------------------------------------
-        # Check rows in table_tow
+        # Check rows in table_two
         # ----------------------------------------------------------------------
         expected_table_two = []
         if not should_hard_deleted_rows:
@@ -135,16 +137,23 @@ class TestTargetRedshift(object):
         # Check rows in table_three
         # ----------------------------------------------------------------------
         expected_table_three = []
-        if not should_hard_deleted_rows:
+        if should_hard_deleted_rows:
+            expected_table_three = [
+                {"c_int": 1, "c_pk": 1, "c_varchar": "1", "c_time": "04:00:00"},
+                {"c_int": 2, "c_pk": 2, "c_varchar": "2", "c_time": "07:15:00"},
+            ]
+        elif should_skip_updates:
             expected_table_three = [
                 {"c_int": 1, "c_pk": 1, "c_varchar": "1", "c_time": "04:00:00"},
                 {"c_int": 2, "c_pk": 2, "c_varchar": "2", "c_time": "07:15:00"},
                 {"c_int": 3, "c_pk": 3, "c_varchar": "3", "c_time": "23:00:03"},
+                {"c_int": 4, "c_pk": 4, "c_varchar": "4_NEW", "c_time": "18:00:10"},
             ]
         else:
             expected_table_three = [
                 {"c_int": 1, "c_pk": 1, "c_varchar": "1", "c_time": "04:00:00"},
                 {"c_int": 2, "c_pk": 2, "c_varchar": "2", "c_time": "07:15:00"},
+                {"c_int": 3, "c_pk": 3, "c_varchar": "3", "c_time": "23:00:03"},
             ]
 
         assert (
@@ -975,3 +984,18 @@ class TestTargetRedshift(object):
 
         # Every table should be loaded correctly
         self.assert_logical_streams_are_in_redshift(should_metadata_columns_exist=True)
+
+    def test_loading_tables_with_skip_updates(self):
+        """Loading records with existing primary keys but skip updates"""
+        tap_lines = test_utils.get_test_tap_lines("messages-with-three-streams.json")
+
+        # Turn on skip_updates mode
+        self.config["skip_updates"] = True
+        target_redshift.persist_lines(self.config, tap_lines)
+        self.assert_three_streams_are_loaded_in_redshift()
+
+        # Load some new records with upserts
+        tap_lines = test_utils.get_test_tap_lines("messages-with-three-streams-upserts.json")
+        target_redshift.persist_lines(self.config, tap_lines)
+
+        self.assert_three_streams_are_loaded_in_redshift(should_skip_updates=True)
