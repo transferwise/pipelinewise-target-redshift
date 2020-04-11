@@ -114,7 +114,7 @@ Full list of options in `config.json`:
 
 
 ```bash
-  coverage run -m pytest --disable-pytest-warnings tests/unit && coverage report
+  coverage run -m pytest -vv --disable-pytest-warnings tests/unit && coverage report
 ```
 
 1. To run integration tests define environment variables first:
@@ -131,7 +131,7 @@ Full list of options in `config.json`:
   export TARGET_REDSHIFT_S3_BUCKET=<s3-bucket>
   export TARGET_REDSHIFT_S3_KEY_PREFIX=<s3-bucket-directory>
 
-  coverage run -m pytest --disable-pytest-warnings tests/integration && coverage report
+  coverage run -m pytest -vv --disable-pytest-warnings tests/integration && coverage report
 ```
 
 ### To run pylint:
