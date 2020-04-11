@@ -436,9 +436,9 @@ class DbSync:
                 logger.debug("REDSHIFT - {}".format(copy_sql))
                 cur.execute(copy_sql)
 
-                # Step 3/a: Insert or Update if primary key defined
+                # Step 5/a: Insert or Update if primary key defined
                 if len(self.stream_schema_message['key_properties']) > 0:
-                    # Step 3/a/1: Insert new records
+                    # Step 5/a/1: Insert new records
                     insert_sql = """INSERT INTO {} ({})
                         SELECT {}
                         FROM {} s LEFT JOIN {}
@@ -455,7 +455,7 @@ class DbSync:
                     )
                     logger.debug("REDSHIFT - {}".format(insert_sql))
                     cur.execute(insert_sql)
-                    # Step 3/a/2: Update existing records
+                    # Step 5/a/2: Update existing records
                     if not self.skip_updates:
                         update_sql = """UPDATE {}
                             SET {}
@@ -470,7 +470,7 @@ class DbSync:
                         logger.info("REDSHIFT - {}".format(update_sql))
                         cur.execute(update_sql)
 
-                # Step 3/b: Insert only if no primary key
+                # Step 5/b: Insert only if no primary key
                 else:
                     insert_sql = """INSERT INTO {} ({})
                         SELECT {}
@@ -484,7 +484,7 @@ class DbSync:
                     logger.debug("REDSHIFT - {}".format(insert_sql))
                     cur.execute(insert_sql)
 
-                # Step 4: Drop stage table
+                # Step 6: Drop stage table
                 cur.execute(self.drop_table_query(is_stage=True))
 
 
