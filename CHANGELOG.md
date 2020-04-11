@@ -1,8 +1,7 @@
-1.3.0 (2019-02)
+1.3.0 (2019-02-18)
 -------------------
 
 - Support custom logging configuration by setting `LOGGING_CONF_FILE` env variable to the absolute path of a .conf file
-
 
 1.2.1 (2019-12-30)
 -------------------
