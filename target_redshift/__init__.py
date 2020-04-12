@@ -301,12 +301,15 @@ def flush_streams(
     # Single-host, thread-based parallelism
     with parallel_backend('threading', n_jobs=parallelism):
         Parallel()(delayed(load_stream_batch)(
-            config=config,
             stream=stream,
             records_to_load=streams[stream],
             row_count=row_count,
-            db_sync=stream_to_sync[stream]
-        ) for (stream) in streams_to_flush)
+            db_sync=stream_to_sync[stream],
+            delete_rows=config.get('hard_delete'),
+            compression=config.get('compression'),
+            slices=config.get('slices'),
+            temp_dir=config.get('temp_dir')
+        ) for stream in streams_to_flush)
 
     # reset flushed stream records to empty to avoid flushing same records
     for stream in streams_to_flush:
@@ -330,12 +333,10 @@ def flush_streams(
     return flushed_state
 
 
-def load_stream_batch(config, stream, records_to_load, row_count, db_sync):
-    delete_rows = config.get('hard_delete', False)
-
+def load_stream_batch(stream, records_to_load, row_count, db_sync, delete_rows=False, compression=None, slices=None, temp_dir=None):
     # Load into redshift
     if row_count[stream] > 0:
-        flush_records(config, stream, records_to_load, row_count[stream], db_sync)
+        flush_records(stream, records_to_load, row_count[stream], db_sync, compression, slices, temp_dir)
 
         # Delete soft-deleted, flagged rows - where _sdc_deleted at is not null
         if delete_rows:
@@ -356,10 +357,14 @@ def ceiling_division(n, d):
     return -(n // -d)
 
 
-def flush_records(config, stream, records_to_load, row_count, db_sync):
-    compression = config.get("compression", "")
+def flush_records(stream, records_to_load, row_count, db_sync, compression=None, slices=None, temp_dir=None):
+    slices = slices or 1
     use_gzip = compression == "gzip"
     use_bzip2 = compression == "bzip2"
+
+    if temp_dir:
+        temp_dir = os.path.expanduser(temp_dir)
+        os.makedirs(temp_dir, exist_ok=True)
 
     open_method = open
     file_extension = ".csv"
@@ -370,11 +375,8 @@ def flush_records(config, stream, records_to_load, row_count, db_sync):
         open_method = bz2.open
         file_extension = file_extension + ".bz2"
 
-    try:
-        slices = int(config.get("slices", 1))
-    except Exception as err:
-        logger.error("The provided configuration value 'slices' was not an integer")
-        raise err
+    if not isinstance(slices, int):
+        raise Exception("The provided configuration value 'slices' was not an integer")
 
     csv_files = []
     s3_keys = []
@@ -387,7 +389,7 @@ def flush_records(config, stream, records_to_load, row_count, db_sync):
         list(records_to_load.values()), ceiling_division(len(records_to_load), slices)
     )
     for chunk_number, chunk in enumerate(chunks, start=1):
-        _, csv_file = mkstemp(suffix=file_extension + "." + str(chunk_number))
+        _, csv_file = mkstemp(suffix=file_extension + "." + str(chunk_number), dir=temp_dir)
         csv_files = csv_files + [csv_file]
         with open_method(csv_file, "w+b") as csv_f:
             for record in chunk:
@@ -409,7 +411,6 @@ def flush_records(config, stream, records_to_load, row_count, db_sync):
         os.remove(csv_file)
     for s3_key in s3_keys:
         db_sync.delete_from_s3(s3_key)
-
 
 
 def main():

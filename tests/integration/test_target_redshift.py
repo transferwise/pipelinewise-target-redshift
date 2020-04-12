@@ -999,3 +999,13 @@ class TestTargetRedshift(object):
         target_redshift.persist_lines(self.config, tap_lines)
 
         self.assert_three_streams_are_loaded_in_redshift(should_skip_updates=True)
+
+    def test_loading_tables_with_custom_temp_dir(self):
+        """Loading multiple tables from the same input tap using custom temp directory"""
+        tap_lines = test_utils.get_test_tap_lines('messages-with-three-streams.json')
+
+        # Setting custom temp_dir
+        self.config['temp_dir'] = ('~/.pipelinewise/tmp')
+        target_redshift.persist_lines(self.config, tap_lines)
+
+        self.assert_three_streams_are_loaded_in_redshift()
