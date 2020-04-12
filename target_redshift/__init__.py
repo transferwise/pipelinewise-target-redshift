@@ -389,7 +389,7 @@ def flush_records(stream, records_to_load, row_count, db_sync, compression=None,
         list(records_to_load.values()), ceiling_division(len(records_to_load), slices)
     )
     for chunk_number, chunk in enumerate(chunks, start=1):
-        _, csv_file = mkstemp(suffix=file_extension + "." + str(chunk_number), dir=temp_dir)
+        _, csv_file = mkstemp(suffix=file_extension + "." + str(chunk_number), prefix=f'{stream}_', dir=temp_dir)
         csv_files = csv_files + [csv_file]
         with open_method(csv_file, "w+b") as csv_f:
             for record in chunk:
