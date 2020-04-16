@@ -258,6 +258,26 @@ class TestTargetRedshift(object):
         assert table_three == []
         assert table_four == []
 
+    def assert_binary_data_are_in_snowflake(self, table_name, should_metadata_columns_exist=False):
+        # Redshift doesn't have binary type. Binary formatted singer values loaded into VARCHAR columns
+        # Get loaded rows from tables
+        snowflake = DbSync(self.config)
+        target_schema = self.config.get('default_target_schema', '')
+        table_one = snowflake.query("SELECT * FROM {}.{} ORDER BY ID".format(target_schema, table_name))
+
+        # ----------------------------------------------------------------------
+        # Check rows in table_one
+        # ----------------------------------------------------------------------
+        expected_table_one = [
+            {'id': '706b32', 'data': '6461746132', 'created_at': datetime.datetime(2019, 12, 17, 16, 2, 55)},
+            {'id': '706b34', 'data': '6461746134', 'created_at': datetime.datetime(2019, 12, 17, 16, 32, 22)},
+        ]
+
+        if should_metadata_columns_exist:
+            assert self.remove_metadata_columns_from_rows(table_one) == expected_table_one
+        else:
+            assert table_one == expected_table_one
+
     #################################
     #           TESTS               #
     #################################
@@ -357,6 +377,20 @@ class TestTargetRedshift(object):
         # Check if data loaded correctly
         self.assert_three_streams_are_loaded_in_redshift(
             should_metadata_columns_exist=False, should_hard_deleted_rows=False
+        )
+
+    def test_loading_table_with_reserved_word_as_name_and_hard_delete(self):
+        """Loading a table where the name is a reserved word with deleted rows"""
+        tap_lines = test_utils.get_test_tap_lines('messages-with-reserved-name-as-table-name.json')
+
+        # Turning on hard delete mode
+        self.config['hard_delete'] = True
+        target_redshift.persist_lines(self.config, tap_lines)
+
+        # Check if data loaded correctly and metadata columns exist
+        self.assert_binary_data_are_in_snowflake(
+            table_name='"ORDER"',
+            should_metadata_columns_exist=True
         )
 
     def test_loading_unicode_characters(self):
