@@ -263,14 +263,14 @@ class TestTargetRedshift(object):
         # Get loaded rows from tables
         snowflake = DbSync(self.config)
         target_schema = self.config.get('default_target_schema', '')
-        table_one = snowflake.query("SELECT * FROM {}.{} ORDER BY ID".format(target_schema, table_name))
+        table_one = snowflake.query('SELECT * FROM {}.{} ORDER BY "new"'.format(target_schema, table_name))
 
         # ----------------------------------------------------------------------
         # Check rows in table_one
         # ----------------------------------------------------------------------
         expected_table_one = [
-            {'id': '706b32', 'data': '6461746132', 'created_at': datetime.datetime(2019, 12, 17, 16, 2, 55)},
-            {'id': '706b34', 'data': '6461746134', 'created_at': datetime.datetime(2019, 12, 17, 16, 32, 22)},
+            {'new': '706b32', 'data': '6461746132', 'created_at': datetime.datetime(2019, 12, 17, 16, 2, 55)},
+            {'new': '706b34', 'data': '6461746134', 'created_at': datetime.datetime(2019, 12, 17, 16, 32, 22)},
         ]
 
         if should_metadata_columns_exist:
