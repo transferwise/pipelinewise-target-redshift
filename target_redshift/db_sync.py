@@ -274,7 +274,7 @@ class DbSync:
                 self.schema_name = config_default_target_schema
 
             if not self.schema_name:
-                raise Exception("Target schema name not defined in config. Neither 'default_target_schema' (string) nor 'schema_mapping' (object) defines target schema for {} stream.".format(self.stream_name))
+                raise Exception("Target schema name not defined in config. Neither 'default_target_schema' (string) nor 'schema_mapping' (object) defines target schema for {} stream.".format(stream_name))
 
             #  Define grantees
             #  ---------------
@@ -379,6 +379,7 @@ class DbSync:
         bucket = self.connection_config['s3_bucket']
         self.s3.delete_object(Bucket=bucket, Key=s3_key)
 
+    # pylint: disable=too-many-locals
     def load_csv(self, s3_key, count, compression=False):
         stream_schema_message = self.stream_schema_message
         stream = stream_schema_message['stream']
@@ -487,10 +488,10 @@ class DbSync:
                         SELECT {}
                         FROM {} s
                     """.format(
-                        self.target_table,
+                        target_table,
                         ', '.join([c['name'] for c in columns_with_trans]),
                         ', '.join(['s.{}'.format(c['name']) for c in columns_with_trans]),
-                        self.stage_table
+                        stage_table
                     )
                     logger.debug("REDSHIFT - {}".format(insert_sql))
                     cur.execute(insert_sql)
