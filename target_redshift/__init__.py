@@ -10,7 +10,7 @@ import gzip
 import bz2
 from datetime import datetime
 from decimal import Decimal
-from tempfile import NamedTemporaryFile, mkstemp
+from tempfile import mkstemp
 
 from joblib import Parallel, delayed, parallel_backend
 from jsonschema import Draft4Validator, FormatChecker
@@ -109,11 +109,9 @@ def persist_lines(config, lines, table_cache=None) -> None:
     key_properties = {}
     validators = {}
     records_to_load = {}
-    csv_files_to_load = {}
     row_count = {}
     stream_to_sync = {}
     total_row_count = {}
-    table_columns_cache = None
     batch_size_rows = config.get('batch_size_rows', DEFAULT_BATCH_SIZE_ROWS)
 
     # Loop over lines from stdin
@@ -236,7 +234,6 @@ def persist_lines(config, lines, table_cache=None) -> None:
 
             row_count[stream] = 0
             total_row_count[stream] = 0
-            csv_files_to_load[stream] = NamedTemporaryFile(mode='w+b')
 
         elif t == 'ACTIVATE_VERSION':
             LOGGER.debug('ACTIVATE_VERSION message')
