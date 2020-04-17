@@ -196,7 +196,7 @@ def stream_name_to_dict(stream_name, separator='-'):
 
 # pylint: disable=too-many-public-methods,too-many-instance-attributes
 class DbSync:
-    def __init__(self, connection_config, stream_schema_message=None):
+    def __init__(self, connection_config, stream_schema_message=None, table_cache=None):
         """
             connection_config:      Redshift connection details
 
@@ -217,6 +217,7 @@ class DbSync:
         """
         self.connection_config = connection_config
         self.stream_schema_message = stream_schema_message
+        self.table_cache = table_cache
 
         # logger to be used across the class's methods
         self.logger = get_logger('target_redshift')
@@ -586,13 +587,13 @@ class DbSync:
         self.logger.info("Deleting rows from '{}' table... {}".format(table, query))
         self.logger.info("DELETE {}".format(len(self.query(query))))
 
-    def create_schema_if_not_exists(self, table_columns_cache=None):
+    def create_schema_if_not_exists(self):
         schema_name = self.schema_name
         schema_rows = 0
 
         # table_columns_cache is an optional pre-collected list of available objects in redshift
-        if table_columns_cache:
-            schema_rows = list(filter(lambda x: x['table_schema'] == schema_name.lower(), table_columns_cache))
+        if self.table_cache:
+            schema_rows = list(filter(lambda x: x['table_schema'] == schema_name.lower(), self.table_cache))
         # Query realtime if not pre-collected
         else:
             schema_rows = self.query(
@@ -606,6 +607,10 @@ class DbSync:
             self.query(query)
 
             self.grant_privilege(schema_name, self.grantees, self.grant_usage_on_schema)
+
+            # Refresh columns cache if required
+            if self.table_cache:
+                self.table_cache = self.get_table_columns(filter_schemas=[self.schema_name])
 
     def get_tables(self, table_schema=None):
         return self.query("""SELECT LOWER(table_schema) table_schema, LOWER(table_name) table_name
@@ -623,20 +628,18 @@ class DbSync:
         if filter_schemas is not None: sql = sql + " AND LOWER(c.table_schema) IN (" + ', '.join("'{}'".format(s).lower() for s in filter_schemas) + ")"
         return self.query(sql)
 
-    def update_columns(self, table_columns_cache=None):
+    def update_columns(self):
         stream_schema_message = self.stream_schema_message
         stream = stream_schema_message['stream']
         table_name = self.table_name(stream, is_stage=False, without_schema=True)
 
-        if table_columns_cache:
+        if self.table_cache:
             columns = list(filter(lambda x: x['table_schema'] == self.schema_name.lower() and
                                             f'"{x["table_name"].upper()}"' == table_name,
-                                  table_columns_cache))
+                                  self.table_cache))
         else:
             columns = self.get_table_columns(self.schema_name, table_name)
 
-        self.logger.info(table_columns_cache)
-        self.logger.info(self.get_table_columns(self.schema_name, table_name))
         columns_dict = {column['column_name'].lower(): column for column in columns}
 
         columns_to_add = [
@@ -678,6 +681,10 @@ class DbSync:
             self.version_column(column_name, stream)
             self.add_column(column, stream)
 
+        # Refresh table cache if required
+        if self.table_cache and (len(columns_to_add) > 0 or len(columns_to_replace)):
+            self.table_cache = self.get_table_columns(filter_schemas=[self.schema_name])
+
     def drop_column(self, column_name, stream):
         drop_column = "ALTER TABLE {} DROP COLUMN {}".format(self.table_name(stream, is_stage=False), column_name)
         self.logger.info('Dropping column: {}'.format(drop_column))
@@ -708,16 +715,16 @@ class DbSync:
         self.create_table(is_stage=is_stage)
         self.grant_privilege(self.schema_name, self.grantees, self.grant_select_on_all_tables_in_schema)
 
-    def sync_table(self, table_columns_cache=None):
+    def sync_table(self):
         stream_schema_message = self.stream_schema_message
         stream = stream_schema_message['stream']
         table_name = self.table_name(stream, is_stage=False, without_schema=True)
         table_name_with_schema = self.table_name(stream, is_stage=False, without_schema=False)
 
-        if table_columns_cache:
+        if self.table_cache:
             found_tables = list(filter(lambda x: x['table_schema'] == self.schema_name.lower() and
                                                  f'"{x["table_name"].upper()}"' == table_name,
-                                       table_columns_cache))
+                                       self.table_cache))
         else:
             found_tables = [table for table in (self.get_tables(self.schema_name.lower()))
                             if f'"{table["table_name"].upper()}"' == table_name]
@@ -728,4 +735,4 @@ class DbSync:
             self.create_table_and_grant_privilege()
         else:
             self.logger.info("Table '{}' exists".format(self.schema_name))
-            self.update_columns(table_columns_cache)
+            self.update_columns()

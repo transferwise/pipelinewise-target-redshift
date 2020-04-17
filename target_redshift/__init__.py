@@ -89,8 +89,20 @@ def get_schema_names_from_config(config):
     return schema_names
 
 
+def load_table_cache(config):
+    table_cache = []
+    if not ('disable_table_cache' in config and config['disable_table_cache']):
+        LOGGER.info("Getting catalog objects from table cache...")
+
+        db = DbSync(config)
+        table_cache = db.get_table_columns(
+            filter_schemas=get_schema_names_from_config(config))
+
+    return table_cache
+
+
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-def persist_lines(config, lines) -> None:
+def persist_lines(config, lines, table_cache=None) -> None:
     state = None
     flushed_state = None
     schemas = {}
@@ -103,13 +115,6 @@ def persist_lines(config, lines) -> None:
     total_row_count = {}
     table_columns_cache = None
     batch_size_rows = config.get('batch_size_rows', DEFAULT_BATCH_SIZE_ROWS)
-
-    # Cache the available schemas, tables and columns from redshift if not disabled in config
-    # The cache will be used later use to avoid lot of small queries hitting redshift
-    if not ('disable_table_cache' in config and config['disable_table_cache'] == True):
-        LOGGER.info("Caching available catalog objects in redshift...")
-        filter_schemas = get_schema_names_from_config(config)
-        table_columns_cache = DbSync(config).get_table_columns(filter_schemas=filter_schemas)
 
     # Loop over lines from stdin
     for line in lines:
@@ -222,12 +227,12 @@ def persist_lines(config, lines) -> None:
             key_properties[stream] = o['key_properties']
 
             if config.get('add_metadata_columns') or config.get('hard_delete'):
-                stream_to_sync[stream] = DbSync(config, add_metadata_columns_to_schema(o))
+                stream_to_sync[stream] = DbSync(config, add_metadata_columns_to_schema(o), table_cache)
             else:
-                stream_to_sync[stream] = DbSync(config, o)
+                stream_to_sync[stream] = DbSync(config, o, table_cache)
 
-            stream_to_sync[stream].create_schema_if_not_exists(table_columns_cache)
-            stream_to_sync[stream].sync_table(table_columns_cache)
+            stream_to_sync[stream].create_schema_if_not_exists()
+            stream_to_sync[stream].sync_table()
 
             row_count[stream] = 0
             total_row_count[stream] = 0
@@ -426,8 +431,11 @@ def main():
     else:
         config = {}
 
+    # Init columns cache
+    table_cache = load_table_cache(config)
+
     singer_messages = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
-    persist_lines(config, singer_messages)
+    persist_lines(config, singer_messages, table_cache)
 
     LOGGER.debug("Exiting normally")
 
