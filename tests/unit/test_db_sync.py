@@ -281,3 +281,44 @@ class TestTargetRedshift(object):
                 "c_obj__nested_prop3__multi_nested_prop2": "multi_value_2"
             }
 
+    def test_flatten_record_with_flatten_schema(self):
+        flatten_record = target_redshift.db_sync.flatten_record
+
+        flatten_schema = {
+            "id": {
+                "type": [
+                    "object",
+                    "array",
+                    "null"
+                ]
+            }
+        }
+
+        test_cases = [
+            (
+                True,
+                {
+                    "id": 1,
+                    "data": "xyz"
+                },
+                {
+                    "id": "1",
+                    "data": "xyz"
+                }
+            ),
+            (
+                False,
+                {
+                    "id": 1,
+                    "data": "xyz"
+                },
+                {
+                    "id": 1,
+                    "data": "xyz"
+                }
+            )
+        ]
+
+        for idx, (should_use_flatten_schema, record, expected_output) in enumerate(test_cases):
+            output = flatten_record(record, flatten_schema if should_use_flatten_schema else None)
+            assert output == expected_output
