@@ -12,14 +12,14 @@ from datetime import datetime
 from decimal import Decimal
 from tempfile import NamedTemporaryFile, mkstemp
 
-import singer
 from joblib import Parallel, delayed, parallel_backend
 from jsonschema import Draft4Validator, FormatChecker
+from singer import get_logger
 from itertools import islice
 
 from target_redshift.db_sync import DbSync
 
-logger = singer.get_logger('target_redshift')
+LOGGER = get_logger('target_redshift')
 
 DEFAULT_BATCH_SIZE_ROWS = 100000
 DEFAULT_PARALLELISM = 0  # 0 The number of threads used to flush tables
@@ -69,7 +69,7 @@ def add_metadata_values_to_record(record_message, stream_to_sync):
 def emit_state(state):
     if state is not None:
         line = json.dumps(state)
-        logger.info('Emitting state {}'.format(line))
+        LOGGER.info('Emitting state {}'.format(line))
         sys.stdout.write("{}\n".format(line))
         sys.stdout.flush()
 
@@ -107,7 +107,7 @@ def persist_lines(config, lines) -> None:
     # Cache the available schemas, tables and columns from redshift if not disabled in config
     # The cache will be used later use to avoid lot of small queries hitting redshift
     if not ('disable_table_cache' in config and config['disable_table_cache'] == True):
-        logger.info("Caching available catalog objects in redshift...")
+        LOGGER.info("Caching available catalog objects in redshift...")
         filter_schemas = get_schema_names_from_config(config)
         table_columns_cache = DbSync(config).get_table_columns(filter_schemas=filter_schemas)
 
@@ -116,7 +116,7 @@ def persist_lines(config, lines) -> None:
         try:
             o = json.loads(line)
         except json.decoder.JSONDecodeError:
-            logger.error("Unable to parse:\n{}".format(line))
+            LOGGER.error("Unable to parse:\n{}".format(line))
             raise
 
         if 'type' not in o:
@@ -139,7 +139,7 @@ def persist_lines(config, lines) -> None:
                 validators[stream].validate(float_to_decimal(o['record']))
             except Exception as ex:
                 if type(ex).__name__ == "InvalidOperation":
-                    logger.error(
+                    LOGGER.error(
                         "Data validation failed and cannot load to destination. RECORD: {}\n'multipleOf' validations "
                         "that allows long precisions are not supported (i.e. with 15 digits or more). Try removing "
                         "'multipleOf' methods from JSON schema. "
@@ -216,7 +216,7 @@ def persist_lines(config, lines) -> None:
             #  or
             #  2) Use fastsync [postgres-to-redshift, mysql-to-redshift, etc.]
             if config.get('primary_key_required', True) and len(o['key_properties']) == 0:
-                logger.critical("Primary key is set to mandatory but not defined in the [{}] stream".format(stream))
+                LOGGER.critical("Primary key is set to mandatory but not defined in the [{}] stream".format(stream))
                 raise Exception("key_properties field is required")
 
             key_properties[stream] = o['key_properties']
@@ -234,10 +234,10 @@ def persist_lines(config, lines) -> None:
             csv_files_to_load[stream] = NamedTemporaryFile(mode='w+b')
 
         elif t == 'ACTIVATE_VERSION':
-            logger.debug('ACTIVATE_VERSION message')
+            LOGGER.debug('ACTIVATE_VERSION message')
 
         elif t == 'STATE':
-            logger.debug('Setting state to {}'.format(o['value']))
+            LOGGER.debug('Setting state to {}'.format(o['value']))
             state = o['value']
 
             # Initially set flushed state
@@ -416,9 +416,9 @@ def flush_records(stream, records_to_load, row_count, db_sync, compression=None,
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', help='Config file')
-    args = parser.parse_args()
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument('-c', '--config', help='Config file')
+    args = arg_parser.parse_args()
 
     if args.config:
         with open(args.config) as config_input:
@@ -429,7 +429,7 @@ def main():
     singer_messages = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
     persist_lines(config, singer_messages)
 
-    logger.debug("Exiting normally")
+    LOGGER.debug("Exiting normally")
 
 
 if __name__ == '__main__':
