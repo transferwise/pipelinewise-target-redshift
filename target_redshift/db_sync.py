@@ -391,7 +391,7 @@ class DbSync:
         self.s3.delete_object(Bucket=bucket, Key=s3_key)
 
     # pylint: disable=too-many-locals
-    def load_csv(self, s3_key, count, compression=False):
+    def load_csv(self, s3_key, count, size_bytes, compression=False):
         stream_schema_message = self.stream_schema_message
         stream = stream_schema_message['stream']
         stage_table = self.table_name(stream, is_stage=True)
@@ -410,6 +410,8 @@ class DbSync:
 
         with self.open_connection() as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                inserts = 0
+                updates = 0
 
                 # Step 1: Create stage table if not exists
                 cur.execute(self.drop_table_query(is_stage=True))
@@ -460,8 +462,26 @@ class DbSync:
                 cur.execute(copy_sql)
 
                 # Step 5/a: Insert or Update if primary key defined
+                #           Do UPDATE first and second INSERT to calculate
+                #           the number of affected rows correctly
                 if len(stream_schema_message['key_properties']) > 0:
-                    # Step 5/a/1: Insert new records
+                    # Step 5/a/1: Update existing records
+                    if not self.skip_updates:
+                        update_sql = """UPDATE {}
+                            SET {}
+                            FROM {} s
+                            WHERE {}
+                        """.format(
+                            target_table,
+                            ', '.join(['{} = s.{}'.format(c['name'], c['name']) for c in columns_with_trans]),
+                            stage_table,
+                            self.primary_key_merge_condition()
+                        )
+                        logger.info("REDSHIFT - {}".format(update_sql))
+                        cur.execute(update_sql)
+                        updates = cur.rowcount
+
+                    # Step 5/a/2: Insert new records
                     insert_sql = """INSERT INTO {} ({})
                         SELECT {}
                         FROM {} s LEFT JOIN {}
@@ -478,20 +498,7 @@ class DbSync:
                     )
                     logger.debug("REDSHIFT - {}".format(insert_sql))
                     cur.execute(insert_sql)
-                    # Step 5/a/2: Update existing records
-                    if not self.skip_updates:
-                        update_sql = """UPDATE {}
-                            SET {}
-                            FROM {} s
-                            WHERE {}
-                        """.format(
-                            target_table,
-                            ', '.join(['{} = s.{}'.format(c['name'], c['name']) for c in columns_with_trans]),
-                            stage_table,
-                            self.primary_key_merge_condition()
-                        )
-                        logger.info("REDSHIFT - {}".format(update_sql))
-                        cur.execute(update_sql)
+                    inserts = cur.rowcount
 
                 # Step 5/b: Insert only if no primary key
                 else:
@@ -506,9 +513,14 @@ class DbSync:
                     )
                     logger.debug("REDSHIFT - {}".format(insert_sql))
                     cur.execute(insert_sql)
+                    inserts = cur.rowcount
 
                 # Step 6: Drop stage table
                 cur.execute(self.drop_table_query(is_stage=True))
+
+                logger.info('Loading into {}: {}'.format(
+                    self.table_name(stream, False),
+                    json.dumps({'inserts': inserts, 'updates': updates, 'size_bytes': size_bytes})))
 
     def primary_key_merge_condition(self):
         stream_schema_message = self.stream_schema_message
