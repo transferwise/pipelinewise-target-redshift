@@ -11,9 +11,8 @@ import psycopg2
 import psycopg2.extras
 
 import inflection
-import singer
+from singer import get_logger
 
-logger = singer.get_logger('target_redshift')
 
 DEFAULT_VARCHAR_LENGTH = 10000
 SHORT_VARCHAR_LENGTH = 256
@@ -219,12 +218,15 @@ class DbSync:
         self.connection_config = connection_config
         self.stream_schema_message = stream_schema_message
 
+        # logger to be used across the class's methods
+        self.logger = get_logger('target_redshift')
+
         # Validate connection configuration
         config_errors = validate_config(connection_config)
 
         # Exit if config has errors
         if len(config_errors) != 0:
-            logger.error("Invalid configuration:\n   * {}".format('\n   * '.join(config_errors)))
+            self.logger.error("Invalid configuration:\n   * {}".format('\n   * '.join(config_errors)))
             sys.exit(1)
 
         aws_access_key_id = self.connection_config.get('aws_access_key_id') or os.environ.get('AWS_ACCESS_KEY_ID')
@@ -325,7 +327,7 @@ class DbSync:
         return psycopg2.connect(conn_string)
 
     def query(self, query, params=None):
-        logger.debug("REDSHIFT - Running query: {}".format(query))
+        self.logger.debug("Running query: {}".format(query))
         with self.open_connection() as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                 cur.execute(
@@ -358,7 +360,7 @@ class DbSync:
         try:
             key_props = [str(flatten[p]) for p in self.stream_schema_message['key_properties']]
         except Exception as exc:
-            logger.info("Cannot find {} primary key(s) in record: {}".format(self.stream_schema_message['key_properties'], flatten))
+            self.logger.info("Cannot find {} primary key(s) in record: {}".format(self.stream_schema_message['key_properties'], flatten))
             raise exc
         return ','.join(key_props)
 
@@ -372,21 +374,21 @@ class DbSync:
         )
 
     def put_to_s3(self, file, stream, count, suffix = ""):
-        logger.info("Uploading {} rows to S3".format(count))
+        self.logger.info("Uploading {} rows to S3".format(count))
 
         # Generating key in S3 bucket
         bucket = self.connection_config['s3_bucket']
         s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
         s3_key = "{}pipelinewise_{}{}".format(s3_key_prefix, stream, suffix)
 
-        logger.info("Target S3 bucket: {}, local file: {}, S3 key: {}".format(bucket, file, s3_key))
+        self.logger.info("Target S3 bucket: {}, local file: {}, S3 key: {}".format(bucket, file, s3_key))
 
         self.s3.upload_file(file, bucket, s3_key)
 
         return s3_key
 
     def delete_from_s3(self, s3_key):
-        logger.info("Deleting {} from S3".format(s3_key))
+        self.logger.info("Deleting {} from S3".format(s3_key))
         bucket = self.connection_config['s3_bucket']
         self.s3.delete_object(Bucket=bucket, Key=s3_key)
 
@@ -397,7 +399,7 @@ class DbSync:
         stage_table = self.table_name(stream, is_stage=True)
         target_table = self.table_name(stream, is_stage=False)
 
-        logger.info("Loading {} rows into '{}'".format(count, self.table_name(stream, is_stage=True)))
+        self.logger.info("Loading {} rows into '{}'".format(count, self.table_name(stream, is_stage=True)))
 
         # Get list if columns with types
         columns_with_trans = [
@@ -458,7 +460,7 @@ class DbSync:
                     copy_options=copy_options,
                     compression_option=compression_option
                 )
-                logger.debug("REDSHIFT - {}".format(copy_sql))
+                self.logger.debug("Running query: {}".format(copy_sql))
                 cur.execute(copy_sql)
 
                 # Step 5/a: Insert or Update if primary key defined
@@ -477,7 +479,7 @@ class DbSync:
                             stage_table,
                             self.primary_key_merge_condition()
                         )
-                        logger.info("REDSHIFT - {}".format(update_sql))
+                        self.logger.debug("Running query: {}".format(update_sql))
                         cur.execute(update_sql)
                         updates = cur.rowcount
 
@@ -496,7 +498,7 @@ class DbSync:
                         self.primary_key_merge_condition(),
                         ' AND '.join(['{}.{} IS NULL'.format(target_table, c) for c in primary_column_names(stream_schema_message)])
                     )
-                    logger.debug("REDSHIFT - {}".format(insert_sql))
+                    self.logger.debug("Running query: {}".format(insert_sql))
                     cur.execute(insert_sql)
                     inserts = cur.rowcount
 
@@ -511,14 +513,14 @@ class DbSync:
                         ', '.join(['s.{}'.format(c['name']) for c in columns_with_trans]),
                         stage_table
                     )
-                    logger.debug("REDSHIFT - {}".format(insert_sql))
+                    self.logger.debug("Running query: {}".format(insert_sql))
                     cur.execute(insert_sql)
                     inserts = cur.rowcount
 
                 # Step 6: Drop stage table
                 cur.execute(self.drop_table_query(is_stage=True))
 
-                logger.info('Loading into {}: {}'.format(
+                self.logger.info('Loading into {}: {}'.format(
                     self.table_name(stream, False),
                     json.dumps({'inserts': inserts, 'updates': updates, 'size_bytes': size_bytes})))
 
@@ -555,12 +557,13 @@ class DbSync:
 
     def grant_usage_on_schema(self, schema_name, grantee, to_group=False):
         query = "GRANT USAGE ON SCHEMA {} TO {} {}".format(schema_name, 'GROUP' if to_group else '', grantee)
-        logger.info("Granting USAGE privilegue on '{}' schema to '{}'... {}".format(schema_name, grantee, query))
+        self.logger.info("Granting USAGE privilege on '{}' schema to '{}'... {}".format(schema_name, grantee, query))
         self.query(query)
 
     def grant_select_on_all_tables_in_schema(self, schema_name, grantee, to_group=False):
         query = "GRANT SELECT ON ALL TABLES IN SCHEMA {} TO {} {}".format(schema_name, 'GROUP' if to_group else '', grantee)
-        logger.info("Granting SELECT ON ALL TABLES privilegue on '{}' schema to '{}'... {}".format(schema_name, grantee, query))
+        self.logger.info(
+            "Granting SELECT ON ALL TABLES privilegue on '{}' schema to '{}'... {}".format(schema_name, grantee, query))
         self.query(query)
 
     @classmethod
@@ -580,8 +583,8 @@ class DbSync:
     def delete_rows(self, stream):
         table = self.table_name(stream, is_stage=False)
         query = "DELETE FROM {} WHERE _sdc_deleted_at IS NOT NULL".format(table)
-        logger.info("Deleting rows from '{}' table... {}".format(table, query))
-        logger.info("DELETE {}".format(len(self.query(query))))
+        self.logger.info("Deleting rows from '{}' table... {}".format(table, query))
+        self.logger.info("DELETE {}".format(len(self.query(query))))
 
     def create_schema_if_not_exists(self, table_columns_cache=None):
         schema_name = self.schema_name
@@ -599,7 +602,7 @@ class DbSync:
 
         if len(schema_rows) == 0:
             query = "CREATE SCHEMA IF NOT EXISTS {}".format(schema_name)
-            logger.info("Schema '{}' does not exist. Creating... {}".format(schema_name, query))
+            self.logger.info("Schema '{}' does not exist. Creating... {}".format(schema_name, query))
             self.query(query)
 
             self.grant_privilege(schema_name, self.grantees, self.grant_usage_on_schema)
@@ -618,7 +621,6 @@ class DbSync:
         if table_schema is not None: sql = sql + " AND LOWER(c.table_schema) = '" + table_schema.lower() + "'"
         if table_name is not None: sql = sql + " AND LOWER(c.table_name) = '" + table_name.replace("\"", "").lower() + "'"
         if filter_schemas is not None: sql = sql + " AND LOWER(c.table_schema) IN (" + ', '.join("'{}'".format(s).lower() for s in filter_schemas) + ")"
-        logger.info(sql)
         return self.query(sql)
 
     def update_columns(self, table_columns_cache=None):
@@ -633,8 +635,8 @@ class DbSync:
         else:
             columns = self.get_table_columns(self.schema_name, table_name)
 
-        logger.info(table_columns_cache)
-        logger.info(self.get_table_columns(self.schema_name, table_name))
+        self.logger.info(table_columns_cache)
+        self.logger.info(self.get_table_columns(self.schema_name, table_name))
         columns_dict = {column['column_name'].lower(): column for column in columns}
 
         columns_to_add = [
@@ -678,7 +680,7 @@ class DbSync:
 
     def drop_column(self, column_name, stream):
         drop_column = "ALTER TABLE {} DROP COLUMN {}".format(self.table_name(stream, is_stage=False), column_name)
-        logger.info('Dropping column: {}'.format(drop_column))
+        self.logger.info('Dropping column: {}'.format(drop_column))
         self.query(drop_column)
 
     def version_column(self, column_name, stream):
@@ -686,18 +688,18 @@ class DbSync:
                                                                                column_name,
                                                                                column_name.replace("\"", ""),
                                                                                time.strftime("%Y%m%d_%H%M"))
-        logger.info('Versioning column: {}'.format(version_column))
+        self.logger.info('Versioning column: {}'.format(version_column))
         self.query(version_column)
 
     def add_column(self, column, stream):
         add_column = "ALTER TABLE {} ADD COLUMN {}".format(self.table_name(stream, is_stage=False), column)
-        logger.info('Adding column: {}'.format(add_column))
+        self.logger.info('Adding column: {}'.format(add_column))
         self.query(add_column)
 
     def create_table(self, is_stage=False):
         stream_schema_message = self.stream_schema_message
         stream = stream_schema_message['stream']
-        logger.info("(Re)creating {} table...".format(self.table_name(stream, is_stage)))
+        self.logger.info("(Re)creating {} table...".format(self.table_name(stream, is_stage)))
 
         self.query(self.drop_table_query(is_stage=is_stage))
         self.query(self.create_table_query(is_stage=is_stage))
@@ -722,8 +724,8 @@ class DbSync:
 
         # Create target table if not exists
         if len(found_tables) == 0:
-            logger.info("Table '{}' does not exist. Creating...".format(table_name_with_schema))
+            self.logger.info("Table '{}' does not exist. Creating...".format(table_name_with_schema))
             self.create_table_and_grant_privilege()
         else:
-            logger.info("Table '{}' exists".format(self.schema_name))
+            self.logger.info("Table '{}' exists".format(self.schema_name))
             self.update_columns(table_columns_cache)
