@@ -5,7 +5,10 @@ import mock
 import datetime
 
 import target_redshift
+from target_redshift import RecordValidationException
 from target_redshift.db_sync import DbSync
+
+from psycopg2 import InternalError
 
 try:
     import tests.utils as test_utils
@@ -944,6 +947,21 @@ class TestTargetRedshift(object):
 
         # Every table should be loaded correctly
         self.assert_logical_streams_are_in_redshift(should_metadata_columns_exist=True)
+
+    def test_record_validation(self):
+        """Test validating records"""
+        tap_lines = test_utils.get_test_tap_lines('messages-with-invalid-records.json')
+
+        # Loading invalid records when record validation enabled should fail at ...
+        self.config['validate_records'] = True
+
+        with pytest.raises(RecordValidationException):
+            target_redshift.persist_lines(self.config, tap_lines)
+
+        # Loading invalid records when record validation disabled should fail at load time
+        self.config['validate_records'] = False
+        with pytest.raises(InternalError):
+            target_redshift.persist_lines(self.config, tap_lines)
 
     @mock.patch('target_redshift.emit_state')
     def test_flush_streams_with_intermediate_flushes_on_all_streams(self, mock_emit_state):

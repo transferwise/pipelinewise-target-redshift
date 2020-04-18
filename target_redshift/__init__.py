@@ -26,6 +26,16 @@ DEFAULT_PARALLELISM = 0  # 0 The number of threads used to flush tables
 DEFAULT_MAX_PARALLELISM = 16  # Don't use more than this number of threads by default when flushing streams in parallel
 
 
+class RecordValidationException(Exception):
+    """Exception to raise when record validation failed"""
+    pass
+
+
+class InvalidValidationOperationException(Exception):
+    """Exception to raise when internal JSON schema validation process failed"""
+    pass
+
+
 def float_to_decimal(value):
     """Walk the given data structure and turn all instances of float into
     double."""
@@ -138,16 +148,16 @@ def persist_lines(config, lines, table_cache=None) -> None:
             stream = o['stream']
 
             # Validate record
-            try:
-                validators[stream].validate(float_to_decimal(o['record']))
-            except Exception as ex:
-                if type(ex).__name__ == "InvalidOperation":
-                    LOGGER.error(
-                        "Data validation failed and cannot load to destination. RECORD: {}\n'multipleOf' validations "
-                        "that allows long precisions are not supported (i.e. with 15 digits or more). Try removing "
-                        "'multipleOf' methods from JSON schema. "
-                        .format(o['record']))
-                    raise ex
+            if config.get('validate_records'):
+                try:
+                    validators[stream].validate(float_to_decimal(o['record']))
+                except Exception as ex:
+                    if type(ex).__name__ == "InvalidOperation":
+                        raise InvalidValidationOperationException(
+                            f"Data validation failed and cannot load to destination. RECORD: {o['record']}\n"
+                            "multipleOf validations that allows long precisions are not supported (i.e. with 15 digits"
+                            "or more) Try removing 'multipleOf' methods from JSON schema.")
+                    raise RecordValidationException(f"Record does not pass schema validation. RECORD: {o['record']}")
 
             primary_key_string = stream_to_sync[stream].record_primary_key_string(o['record'])
             if not primary_key_string:
@@ -193,9 +203,8 @@ def persist_lines(config, lines, table_cache=None) -> None:
 
             stream = o['stream']
 
-            schemas[stream] = o
-            schema = float_to_decimal(o['schema'])
-            validators[stream] = Draft4Validator(schema, format_checker=FormatChecker())
+            schemas[stream] = float_to_decimal(o['schema'])
+            validators[stream] = Draft4Validator(schemas[stream], format_checker=FormatChecker())
 
             # flush records from previous stream SCHEMA
             # if same stream has been encountered again, it means the schema might have been altered
