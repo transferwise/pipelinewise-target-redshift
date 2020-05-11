@@ -1,3 +1,15 @@
+1.4.0 (2019-05-11)
+-------------------
+
+- Add `validate_records` option
+- Add `skip_updates` option to skip updates in case of immutable records
+- Add `temp_dir` optional parameter to config
+- Fixed an issue when JSON values sometimes not sent correctly
+- Support usage of reserved words as table and column names
+- Use stream name as temp file suffix
+- Log inserts, updates and csv size_bytes in a more consumable format
+- Switch to `psychopg-binary` 2.8.5
+
 1.3.0 (2019-02-18)
 -------------------
 
