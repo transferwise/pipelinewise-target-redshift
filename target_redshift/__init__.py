@@ -357,7 +357,7 @@ def load_stream_batch(stream, records_to_load, row_count, db_sync, delete_rows=F
             # reset row count for the current stream
             row_count[stream] = 0
     except Exception as e:
-        logger.exception("Failed to load stream %s to Redshift", stream)
+        LOGGER.exception("Failed to load stream %s to Redshift", stream)
         raise e
 
 def chunk_iterable(iterable, size):
