@@ -22,6 +22,7 @@ def get_db_config():
     # AWS IAM and S3 bucket
     config['aws_access_key_id'] = os.environ.get('TARGET_REDSHIFT_AWS_ACCESS_KEY')
     config['aws_secret_access_key'] = os.environ.get('TARGET_REDSHIFT_AWS_SECRET_ACCESS_KEY')
+    config['s3_acl'] = os.environ.get('TARGET_REDSHIFT_S3_ACL')
     config['s3_bucket'] = os.environ.get('TARGET_REDSHIFT_S3_BUCKET')
     config['s3_key_prefix'] = os.environ.get('TARGET_REDSHIFT_S3_KEY_PREFIX')
 

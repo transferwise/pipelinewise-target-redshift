@@ -80,6 +80,7 @@ Full list of options in `config.json`:
 | aws_secret_access_key               | String  | No         | S3 Secret Access Key. Used for S3 and Redshfit copy operations. If not provided, credentials will be collected from the `AWS_SECRET_ACCESS_KEY` environment variable    |
 | aws_session_token                   | String  | No         | S3 AWS STS token for temporary credentials. If not provided, credentials will be collected from the `AWS_SESSION_TOKEN` environment variable              |
 | aws_redshift_copy_role_arn          | String  | No         | AWS Role ARN to be used for the Redshift COPY operation. Used instead of the given AWS keys for the COPY operation if provided - the keys are still used for other S3 operations |
+| s3_acl                              | String  | No         | S3 Object ACL                                                |
 | s3_bucket                           | String  | Yes        | S3 Bucket name                                                |
 | s3_key_prefix                       | String  |            | (Default: None) A static prefix before the generated S3 key names. Using prefixes you can upload files into specific directories in the S3 bucket. |
 | copy_options                        | String  |            | (Default: `EMPTYASNULL BLANKSASNULL TRIMBLANKS TRUNCATECOLUMNS TIMEFORMAT 'auto' COMPUPDATE OFF STATUPDATE OFF`). Parameters to use in the COPY command when loading data to Redshift. Some basic file formatting parameters are fixed values and not recommended overriding them by custom values. They are like: `CSV GZIP DELIMITER ',' REMOVEQUOTES ESCAPE` |
@@ -131,6 +132,7 @@ Full list of options in `config.json`:
   export TARGET_REDSHIFT_SCHEMA=<redshift-target-schema>
   export TARGET_REDSHIFT_AWS_ACCESS_KEY=<aws-access-key-id>
   export TARGET_REDSHIFT_AWS_SECRET_ACCESS_KEY=<aws-access-secret-access-key>
+  export TARGET_REDSHIFT_S3_ACL=<s3-target-acl>
   export TARGET_REDSHIFT_S3_BUCKET=<s3-bucket>
   export TARGET_REDSHIFT_S3_KEY_PREFIX=<s3-bucket-directory>
 
