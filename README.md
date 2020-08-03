@@ -76,15 +76,16 @@ Full list of options in `config.json`:
 | user                                | String  | Yes        | Redshift User                                                 |
 | password                            | String  | Yes        | Redshift Password                                             |
 | dbname                              | String  | Yes        | Redshift Database name                                        |
-| aws_access_key_id                   | String  | No         | S3 Access Key Id. Used for S3 and Redshfit copy operations. If not provided, credentials will be collected from the `AWS_ACCESS_KEY_ID` environment variable      |
-| aws_secret_access_key               | String  | No         | S3 Secret Access Key. Used for S3 and Redshfit copy operations. If not provided, credentials will be collected from the `AWS_SECRET_ACCESS_KEY` environment variable    |
-| aws_session_token                   | String  | No         | S3 AWS STS token for temporary credentials. If not provided, credentials will be collected from the `AWS_SESSION_TOKEN` environment variable              |
+| aws_profile                         | String  | No         | AWS profile name for profile based authentication. If not provided, `AWS_PROFILE` environment variable will be used. |
+| aws_access_key_id                   | String  | No         | S3 Access Key Id. Used for S3 and Redshfit copy operations. If not provided, `AWS_ACCESS_KEY_ID` environment variable will be used. |
+| aws_secret_access_key               | String  | No         | S3 Secret Access Key. Used for S3 and Redshfit copy operations. If not provided, `AWS_SECRET_ACCESS_KEY` environment variable will be used.  |
+| aws_session_token                   | String  | No         | S3 AWS STS token for temporary credentials. If not provided, `AWS_SESSION_TOKEN` environment variable will be used. |
 | aws_redshift_copy_role_arn          | String  | No         | AWS Role ARN to be used for the Redshift COPY operation. Used instead of the given AWS keys for the COPY operation if provided - the keys are still used for other S3 operations |
 | s3_acl                              | String  | No         | S3 Object ACL                                                |
 | s3_bucket                           | String  | Yes        | S3 Bucket name                                                |
 | s3_key_prefix                       | String  |            | (Default: None) A static prefix before the generated S3 key names. Using prefixes you can upload files into specific directories in the S3 bucket. |
 | copy_options                        | String  |            | (Default: `EMPTYASNULL BLANKSASNULL TRIMBLANKS TRUNCATECOLUMNS TIMEFORMAT 'auto' COMPUPDATE OFF STATUPDATE OFF`). Parameters to use in the COPY command when loading data to Redshift. Some basic file formatting parameters are fixed values and not recommended overriding them by custom values. They are like: `CSV GZIP DELIMITER ',' REMOVEQUOTES ESCAPE` |
-| batch_size_rows                      | Integer |            | (Default: 100000) Maximum number of rows in each batch. At the end of each batch, the rows in the batch are loaded into Redshift. |
+| batch_size_rows                     | Integer |            | (Default: 100000) Maximum number of rows in each batch. At the end of each batch, the rows in the batch are loaded into Redshift. |
 | flush_all_streams                   | Boolean |            | (Default: False) Flush and load every stream into Redshift when one batch is full. Warning: This may trigger the COPY command to use files with low number of records, and may cause performance problems. |
 | parallelism                         | Integer |            | (Default: 0) The number of threads used to flush tables. 0 will create a thread for each stream, up to parallelism_max. -1 will create a thread for each CPU core. Any other positive number will create that number of threads, up to parallelism_max. |
 | max_parallelism                     | Integer |            | (Default: 16) Max number of parallel threads to use when flushing tables. |
