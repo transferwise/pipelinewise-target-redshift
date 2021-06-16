@@ -41,6 +41,7 @@ jobs:
 
       - name: Run Unit Tests
         run: pytest -v --disable-pytest-warnings tests/unit
-
-      - name: Run Integration Tests
-        run: pytest -v --disable-pytest-warnings -v tests/integration
+#
+#     No redshift instance to run these against
+#      - name: Run Integration Tests
+#        run: pytest -v --disable-pytest-warnings -v tests/integration
