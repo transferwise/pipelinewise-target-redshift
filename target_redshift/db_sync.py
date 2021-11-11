@@ -70,7 +70,7 @@ def column_type(schema_property, with_length=True):
         column_type = 'character varying'
         varchar_length = LONG_VARCHAR_LENGTH
     elif 'integer' in property_type:
-        column_type = 'numeric'
+        column_type = 'bigint'
     elif 'boolean' in property_type:
         column_type = 'boolean'
 
