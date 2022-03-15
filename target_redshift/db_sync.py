@@ -52,8 +52,7 @@ def column_type(schema_property, with_length=True):
     if schema_property.get('maxLength', 0) > varchar_length:
         varchar_length = LONG_VARCHAR_LENGTH
     if 'object' in property_type or 'array' in property_type:
-        column_type = 'character varying'
-        varchar_length = LONG_VARCHAR_LENGTH
+        column_type = 'super'
 
     # Every date-time JSON value is currently mapped to TIMESTAMP WITHOUT TIME ZONE
     #
@@ -65,7 +64,9 @@ def column_type(schema_property, with_length=True):
         column_type = 'character varying'
         varchar_length = SHORT_VARCHAR_LENGTH
     elif 'number' in property_type:
-        column_type = 'double precision'
+        # Our number fields are exclusively monetary.  Use numeric(38,2) instead of double precision.
+        column_type = 'numeric(38,2)'
+        with_length = False
     elif 'integer' in property_type and 'string' in property_type:
         column_type = 'character varying'
         varchar_length = LONG_VARCHAR_LENGTH
