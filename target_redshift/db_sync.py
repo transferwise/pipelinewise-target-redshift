@@ -394,6 +394,7 @@ class DbSync:
             extra_args['ServerSideEncryption'] = s3_sse
         if not extra_args:
             extra_args = None
+        self.logger.info(f"S3 extra args: {extra_args}")
 
         self.s3.upload_file(file, bucket, s3_key, ExtraArgs=extra_args)
 
