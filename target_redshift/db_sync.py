@@ -1,9 +1,16 @@
-import collections
+
+import sys
+# pylint: disable=no-name-in-module
+if sys.version_info.major == 3 and sys.version_info.minor >= 10:
+    from collections.abc import MutableMapping
+else:
+    from collections import MutableMapping
+# pylint: enable=no-name-in-module
+
 import itertools
 import json
 import os
 import re
-import sys
 import time
 
 import boto3
@@ -161,7 +168,7 @@ def flatten_record(d, flatten_schema=None, parent_key=[], sep='__', level=0, max
     items = []
     for k, v in d.items():
         new_key = flatten_key(k, parent_key, sep)
-        if isinstance(v, collections.MutableMapping) and level < max_level:
+        if isinstance(v, MutableMapping) and level < max_level:
             items.extend(flatten_record(v, flatten_schema, parent_key + [k], sep=sep, level=level + 1, max_level=max_level).items())
         else:
             items.append((new_key, json.dumps(v) if _should_json_dump_value(k, v, flatten_schema) else v))
