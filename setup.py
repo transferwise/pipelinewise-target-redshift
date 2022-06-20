@@ -26,7 +26,7 @@ setup(name="pipelinewise-target-redshift",
       ],
       extras_require={
           "test": [
-                "pylint==2.4.2",
+                "pylint==2.14.3",
                 "pytest==5.3.0",
                 "mock==3.0.5",
                 "coverage==4.5.4"
