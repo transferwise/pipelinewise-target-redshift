@@ -177,7 +177,7 @@ def stream_name_to_dict(stream_name, separator='-'):
     schema_name = None
     table_name = stream_name
 
-    # Schema and table name can be derived from stream if it's in <schema_nama>-<table_name> format
+    # Schema and table name can be derived from stream if it's in <schema_name>-<table_name> format
     s = stream_name.split(separator)
     if len(s) == 2:
         schema_name = s[0]
@@ -284,9 +284,9 @@ class DbSync:
             stream_name = stream_schema_message['stream']
             stream_schema_name = stream_name_to_dict(stream_name)['schema_name']
             if config_schema_mapping and stream_schema_name in config_schema_mapping:
-                self.schema_name = config_schema_mapping[stream_schema_name].get('target_schema')
+                self.schema_name = config_schema_mapping[stream_schema_name].get('target_schema').replace('-', '_')
             elif config_default_target_schema:
-                self.schema_name = config_default_target_schema
+                self.schema_name = config_default_target_schema.replace('-', '_')
 
             if not self.schema_name:
                 raise Exception("Target schema name not defined in config. Neither 'default_target_schema' (string) nor 'schema_mapping' (object) defines target schema for {} stream.".format(stream_name))
