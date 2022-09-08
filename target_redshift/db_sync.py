@@ -281,7 +281,7 @@ class DbSync:
             config_schema_mapping = self.connection_config.get('schema_mapping', {})
 
             stream_name = stream_schema_message['stream']
-            stream_schema_name = stream_name_to_dict(stream_name)['schema_name']  # ED NOTES maybe we can just change it here?
+            stream_schema_name = stream_name_to_dict(stream_name)['schema_name']
             if config_schema_mapping and stream_schema_name in config_schema_mapping:
                 self.schema_name = config_schema_mapping[stream_schema_name].get('target_schema')
             elif config_default_target_schema:
@@ -559,12 +559,12 @@ class DbSync:
         return "DROP TABLE IF EXISTS {}".format(self.table_name(stream_schema_message['stream'], is_stage))
 
     def grant_usage_on_schema(self, schema_name, grantee, to_group=False):
-        query = "GRANT USAGE ON SCHEMA {} TO {} {}".format(schema_name, 'GROUP' if to_group else '', grantee)
+        query = 'GRANT USAGE ON SCHEMA "{}" TO {} {}'.format(schema_name, 'GROUP' if to_group else '', grantee)
         self.logger.info("Granting USAGE privilege on '{}' schema to '{}'... {}".format(schema_name, grantee, query))
         self.query(query)
 
     def grant_select_on_all_tables_in_schema(self, schema_name, grantee, to_group=False):
-        query = "GRANT SELECT ON ALL TABLES IN SCHEMA '{}' TO '{}' '{}'".format(schema_name, 'GROUP' if to_group else '', grantee)
+        query = 'GRANT SELECT ON ALL TABLES IN SCHEMA "{}" TO {} {}'.format(schema_name, 'GROUP' if to_group else '', grantee)
         self.logger.info(
             "Granting SELECT ON ALL TABLES privilegue on '{}' schema to '{}'... {}".format(schema_name, grantee, query))
         self.query(query)
@@ -590,7 +590,7 @@ class DbSync:
         self.logger.info("DELETE {}".format(len(self.query(query))))
 
     def create_schema_if_not_exists(self):
-        schema_name = f'"{self.schema_name}"'
+        schema_name = self.schema_name
         schema_rows = 0
 
         # table_columns_cache is an optional pre-collected list of available objects in redshift
@@ -599,12 +599,12 @@ class DbSync:
         # Query realtime if not pre-collected
         else:
             schema_rows = self.query(
-                'SELECT LOWER(schema_name) schema_name FROM information_schema.schemata WHERE LOWER(schema_name) = %s',
+                'SELECT LOWER(schema_name) schema_name FROM information_schema.schemata WHERE LOWER(schema_name) = "%s"',
                 (schema_name.lower(),)
             )
 
         if len(schema_rows) == 0:
-            query = "CREATE SCHEMA IF NOT EXISTS {}".format(schema_name)
+            query = 'CREATE SCHEMA IF NOT EXISTS "{}"'.format(schema_name)
             self.logger.info('Schema {} does not exist. Creating... {}'.format(schema_name, query))
             self.query(query)
 
@@ -617,8 +617,8 @@ class DbSync:
     def get_tables(self, table_schema=None):
         return self.query("""SELECT LOWER(table_schema) table_schema, LOWER(table_name) table_name
             FROM information_schema.tables
-            WHERE LOWER(table_schema) = '{}'""".format(
-                "LOWER(table_schema)" if table_schema is None else "{}".format(table_schema.lower())
+            WHERE LOWER(table_schema) = {}""".format(
+                "LOWER(table_schema)" if table_schema is None else '"{}"'.format(table_schema.lower())
         ))
 
     def get_table_columns(self, table_schema=None, table_name=None, filter_schemas=None):
