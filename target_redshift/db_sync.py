@@ -249,8 +249,10 @@ class DbSync:
             self.connection_config['aws_access_key_id'] = credentials.access_key
             self.connection_config['aws_secret_access_key'] = credentials.secret_key
             self.connection_config['aws_session_token'] = credentials.token
-        else:
+        elif aws_profile:
             aws_session = boto3.session.Session(profile_name=aws_profile)
+        else:
+            aws_session = boto3.session.Session()
 
         self.s3 = aws_session.client('s3')
         self.skip_updates = self.connection_config.get('skip_updates', False)
