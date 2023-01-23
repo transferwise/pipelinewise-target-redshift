@@ -48,9 +48,8 @@ def column_type(schema_property, with_length=True):
     property_type = schema_property['type']
     property_format = schema_property['format'] if 'format' in schema_property else None
     column_type = 'character varying'
-    varchar_length = DEFAULT_VARCHAR_LENGTH
-    if schema_property.get('maxLength', 0) > varchar_length:
-        varchar_length = LONG_VARCHAR_LENGTH
+    varchar_length = schema_property.get('maxLength', DEFAULT_VARCHAR_LENGTH)
+
     if 'object' in property_type or 'array' in property_type:
         column_type = 'character varying'
         varchar_length = LONG_VARCHAR_LENGTH
