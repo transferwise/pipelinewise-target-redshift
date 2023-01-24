@@ -321,7 +321,7 @@ class DbSync:
         return redshift_connector.connect(
             host=self.connection_config['host'],
             database=self.connection_config['dbname'],
-            user=self.connection_config['user']
+            user=self.connection_config['user'],
             password=self.connection_config['password'],
             port=self.connection_config['port']
         )
