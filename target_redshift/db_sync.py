@@ -48,9 +48,8 @@ def column_type(schema_property, with_length=True):
     property_type = schema_property['type']
     property_format = schema_property['format'] if 'format' in schema_property else None
     column_type = 'character varying'
-    varchar_length = DEFAULT_VARCHAR_LENGTH
-    if schema_property.get('maxLength', 0) > varchar_length:
-        varchar_length = LONG_VARCHAR_LENGTH
+    varchar_length = schema_property.get('maxLength', DEFAULT_VARCHAR_LENGTH)
+
     if 'object' in property_type or 'array' in property_type:
         column_type = 'character varying'
         varchar_length = LONG_VARCHAR_LENGTH
@@ -249,8 +248,10 @@ class DbSync:
             self.connection_config['aws_access_key_id'] = credentials.access_key
             self.connection_config['aws_secret_access_key'] = credentials.secret_key
             self.connection_config['aws_session_token'] = credentials.token
-        else:
+        elif aws_profile:
             aws_session = boto3.session.Session(profile_name=aws_profile)
+        else:
+            aws_session = boto3.session.Session()
 
         self.s3 = aws_session.client('s3')
         self.skip_updates = self.connection_config.get('skip_updates', False)
