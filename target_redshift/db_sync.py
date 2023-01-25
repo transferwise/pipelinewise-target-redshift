@@ -7,8 +7,7 @@ import sys
 import time
 
 import boto3
-import psycopg2
-import psycopg2.extras
+import redshift_connector
 
 import inflection
 from singer import get_logger
@@ -319,20 +318,18 @@ class DbSync:
             self.flatten_schema = flatten_schema(stream_schema_message['schema'], max_level=self.data_flattening_max_level)
 
     def open_connection(self):
-        conn_string = "host='{}' dbname='{}' user='{}' password='{}' port='{}'".format(
-            self.connection_config['host'],
-            self.connection_config['dbname'],
-            self.connection_config['user'],
-            self.connection_config['password'],
-            self.connection_config['port']
+        return redshift_connector.connect(
+            host=self.connection_config['host'],
+            database=self.connection_config['dbname'],
+            user=self.connection_config['user'],
+            password=self.connection_config['password'],
+            port=self.connection_config['port']
         )
-
-        return psycopg2.connect(conn_string)
 
     def query(self, query, params=None):
         self.logger.debug("Running query: {}".format(query))
         with self.open_connection() as connection:
-            with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+            with connection.cursor() as cur:
                 cur.execute(
                     query,
                     params
@@ -416,7 +413,7 @@ class DbSync:
         ]
 
         with self.open_connection() as connection:
-            with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+            with connection.cursor() as cur:
                 inserts = 0
                 updates = 0
 
