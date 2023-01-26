@@ -13,7 +13,7 @@ import sys
 import time
 
 import boto3
-import pyscopg2
+import psycopg2
 import psycopg2.extras
 
 import inflection
