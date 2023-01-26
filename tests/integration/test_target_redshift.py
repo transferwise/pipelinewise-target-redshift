@@ -8,7 +8,7 @@ import target_redshift
 from target_redshift import RecordValidationException
 from target_redshift.db_sync import DbSync
 
-from redshift_connector import InternalError
+from psycopg2 import InternalError
 
 try:
     import tests.utils as test_utils
