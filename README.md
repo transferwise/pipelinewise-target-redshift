@@ -77,8 +77,8 @@ Full list of options in `config.json`:
 | password                            | String  | Yes        | Redshift Password                                             |
 | dbname                              | String  | Yes        | Redshift Database name                                        |
 | aws_profile                         | String  | No         | AWS profile name for profile based authentication. If not provided, `AWS_PROFILE` environment variable will be used. |
-| aws_access_key_id                   | String  | No         | S3 Access Key Id. Used for S3 and Redshfit copy operations. If not provided, `AWS_ACCESS_KEY_ID` environment variable will be used. |
-| aws_secret_access_key               | String  | No         | S3 Secret Access Key. Used for S3 and Redshfit copy operations. If not provided, `AWS_SECRET_ACCESS_KEY` environment variable will be used.  |
+| aws_access_key_id                   | String  | No         | S3 Access Key Id. Used for S3 and Redshfit copy operations. If not provided, `AWS_ACCESS_KEY_ID` environment variable will be used. Lastly, if env is not found, will assume AWS service role and use temporary credentials instead |
+| aws_secret_access_key               | String  | No         | S3 Secret Access Key. Used for S3 and Redshfit copy operations. If not provided, `AWS_SECRET_ACCESS_KEY` environment variable will be used. Lastly, if env is not found, will assume AWS service role and use temporary credentials instead |
 | aws_session_token                   | String  | No         | S3 AWS STS token for temporary credentials. If not provided, `AWS_SESSION_TOKEN` environment variable will be used. |
 | aws_redshift_copy_role_arn          | String  | No         | AWS Role ARN to be used for the Redshift COPY operation. Used instead of the given AWS keys for the COPY operation if provided - the keys are still used for other S3 operations |
 | s3_acl                              | String  | No         | S3 Object ACL                                                |
