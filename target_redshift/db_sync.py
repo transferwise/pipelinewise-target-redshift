@@ -246,8 +246,8 @@ class DbSync:
         elif aws_profile:
             aws_session = boto3.session.Session(profile_name=aws_profile)
         else:
-            # Attempt to retrieve the temporary credentials from AWS service role
-            # TODO: Add logging and more explain
+            # Attempt to retrieve the temporary credentials from AWS IAM Service role
+            self.logger.info("No AWS credentials or profile found. Will attempt to assume service role and retrieve temporary credentials")
             aws_session = boto3.session.Session()
             
         credentials = aws_session.get_credentials().get_frozen_credentials()
