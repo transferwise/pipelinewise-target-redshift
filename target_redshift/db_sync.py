@@ -11,6 +11,7 @@ import psycopg2
 import psycopg2.extras
 
 import inflection
+from fnmatch import fnmatch
 from singer import get_logger
 
 
@@ -281,16 +282,6 @@ class DbSync:
             config_default_target_schema = self.connection_config.get('default_target_schema', '').strip()
             config_schema_mapping = self.connection_config.get('schema_mapping', {})
 
-            stream_name = stream_schema_message['stream']
-            stream_schema_name = stream_name_to_dict(stream_name)['schema_name']
-            if config_schema_mapping and stream_schema_name in config_schema_mapping:
-                self.schema_name = config_schema_mapping[stream_schema_name].get('target_schema')
-            elif config_default_target_schema:
-                self.schema_name = config_default_target_schema
-
-            if not self.schema_name:
-                raise Exception("Target schema name not defined in config. Neither 'default_target_schema' (string) nor 'schema_mapping' (object) defines target schema for {} stream.".format(stream_name))
-
             #  Define grantees
             #  ---------------
             #  Grantees can be defined in multiple ways:
@@ -311,8 +302,23 @@ class DbSync:
             #                                                               }
             #                                                           }
             self.grantees = self.connection_config.get('default_target_schema_select_permissions')
-            if config_schema_mapping and stream_schema_name in config_schema_mapping:
-                self.grantees = config_schema_mapping[stream_schema_name].get('target_schema_select_permissions', self.grantees)
+            
+            schema_mapping_regex = config_schema_mapping.keys()
+
+            stream_name = stream_schema_message['stream']
+            stream_schema_name = stream_name_to_dict(stream_name)['schema_name']
+            if len(schema_mapping_regex) == 0:
+                self.schema_name = config_default_target_schema
+            else:
+                for regex in schema_mapping_regex:
+                    if fnmatch(stream_schema_name, regex):
+                        self.schema_name = config_schema_mapping[regex].get('target_schema')
+                        self.grantees = config_schema_mapping[regex].get('target_schema_select_permissions',
+                                                                             self.grantees)
+                        break
+
+            if not self.schema_name:
+                raise Exception("Target schema name not defined in config. Neither 'default_target_schema' (string) nor 'schema_mapping' (object) defines target schema for {} stream.".format(stream_name))
 
             self.data_flattening_max_level = self.connection_config.get('data_flattening_max_level', 0)
             self.flatten_schema = flatten_schema(stream_schema_message['schema'], max_level=self.data_flattening_max_level)
