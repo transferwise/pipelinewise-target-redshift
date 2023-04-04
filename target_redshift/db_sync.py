@@ -1,4 +1,4 @@
-import collections
+import collections.abc
 import itertools
 import json
 import os
@@ -51,7 +51,9 @@ def column_type(schema_property, with_length=True):
     varchar_length = DEFAULT_VARCHAR_LENGTH
     if schema_property.get('maxLength', 0) > varchar_length:
         varchar_length = LONG_VARCHAR_LENGTH
-    if 'object' in property_type or 'array' in property_type:
+    if 'object' in property_type:
+        column_type = 'super'
+    if 'array' in property_type:
         column_type = 'character varying'
         varchar_length = LONG_VARCHAR_LENGTH
 
@@ -161,7 +163,7 @@ def flatten_record(d, flatten_schema=None, parent_key=[], sep='__', level=0, max
     items = []
     for k, v in d.items():
         new_key = flatten_key(k, parent_key, sep)
-        if isinstance(v, collections.MutableMapping) and level < max_level:
+        if isinstance(v, collections.abc.MutableMapping) and level < max_level:
             items.extend(flatten_record(v, flatten_schema, parent_key + [k], sep=sep, level=level + 1, max_level=max_level).items())
         else:
             items.append((new_key, json.dumps(v) if _should_json_dump_value(k, v, flatten_schema) else v))
