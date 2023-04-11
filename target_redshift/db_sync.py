@@ -230,10 +230,10 @@ class DbSync:
             self.logger.error("Invalid configuration:\n   * {}".format('\n   * '.join(config_errors)))
             sys.exit(1)
 
-        aws_profile = self.connection_config.get('aws_profile') or os.environ.get('AWS_PROFILE')
-        aws_access_key_id = self.connection_config.get('aws_access_key_id') or os.environ.get('AWS_ACCESS_KEY_ID')
-        aws_secret_access_key = self.connection_config.get('aws_secret_access_key') or os.environ.get('AWS_SECRET_ACCESS_KEY')
-        aws_session_token = self.connection_config.get('aws_session_token') or os.environ.get('AWS_SESSION_TOKEN')
+        aws_profile = self.connection_config.get('aws_profile') # or os.environ.get('AWS_PROFILE')
+        aws_access_key_id = self.connection_config.get('aws_access_key_id') # or os.environ.get('AWS_ACCESS_KEY_ID')
+        aws_secret_access_key = self.connection_config.get('aws_secret_access_key') # or os.environ.get('AWS_SECRET_ACCESS_KEY')
+        aws_session_token = self.connection_config.get('aws_session_token') # or os.environ.get('AWS_SESSION_TOKEN')
 
         # Init S3 client
         # Conditionally pass keys as this seems to affect whether instance credentials are correctly loaded if the keys are None
