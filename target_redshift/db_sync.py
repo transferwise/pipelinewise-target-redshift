@@ -5,10 +5,10 @@ import os
 import re
 import sys
 import time
+import uuid
 from typing import Any
 
 import boto3
-import botocore.exceptions
 import psycopg2
 import psycopg2.extras
 
@@ -769,7 +769,7 @@ class DbSync:
 
         get_logger().info(f"Assuming {role} in account {role_account}")
 
-        role_session_name = f"{settings['organization_id']}-check_credentials"
+        role_session_name = f"{str(uuid.uuid4())}-monad-target-redshift"
         intermediate_role = sts.assume_role(
             RoleArn=self.intermediary_role, RoleSessionName=role_session_name
         )
