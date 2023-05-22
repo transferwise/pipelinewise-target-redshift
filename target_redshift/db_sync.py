@@ -710,12 +710,12 @@ class DbSync:
             self.table_cache = self.get_table_columns(filter_schemas=[self.schema_name])
 
     def drop_column(self, column_name, stream):
-        drop_column = "ALTER TABLE '{}' DROP COLUMN {}".format(self.table_name(stream, is_stage=False), column_name)
+        drop_column = "ALTER TABLE {} DROP COLUMN {}".format(self.table_name(stream, is_stage=False), column_name)
         self.logger.info('Dropping column: {}'.format(drop_column))
         self.query(drop_column)
 
     def version_column(self, column_name, stream):
-        version_column = "ALTER TABLE '{}' RENAME COLUMN {} TO \"{}_{}\"".format(self.table_name(stream, is_stage=False),
+        version_column = "ALTER TABLE {} RENAME COLUMN {} TO \"{}_{}\"".format(self.table_name(stream, is_stage=False),
                                                                                column_name,
                                                                                column_name.replace("\"", ""),
                                                                                time.strftime("%Y%m%d_%H%M"))
@@ -723,7 +723,7 @@ class DbSync:
         self.query(version_column)
 
     def add_column(self, column, stream):
-        add_column = "ALTER TABLE '{}' ADD COLUMN {}".format(self.table_name(stream, is_stage=False), column)
+        add_column = "ALTER TABLE {} ADD COLUMN {}".format(self.table_name(stream, is_stage=False), column)
         self.logger.info('Adding column: {}'.format(add_column))
         self.query(add_column)
 
