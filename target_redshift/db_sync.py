@@ -5,6 +5,8 @@ import os
 import re
 import sys
 import time
+import uuid
+from typing import Any
 
 import boto3
 import psycopg2
@@ -218,9 +220,16 @@ class DbSync:
         self.stream_schema_message = stream_schema_message
         self.table_cache = table_cache
 
+
         # logger to be used across the class's methods
         self.logger = get_logger('target_redshift')
-
+        self.intermediary_role = connection_config.get('intermediary_role')
+        # Initialize assume role and set aws credentials if intermediary role is provided.
+        if self.intermediary_role:
+            credentials = self.check_and_return_credentials(connection_config)
+            self.connection_config['aws_access_key_id'] = credentials["aws_access_key_id"]
+            self.connection_config['aws_secret_access_key'] = credentials["aws_secret_access_key"]
+            self.connection_config['aws_session_token'] = credentials["aws_session_token"]
         # Validate connection configuration
         config_errors = validate_config(connection_config)
 
@@ -386,14 +395,27 @@ class DbSync:
         self.logger.info("Target S3 bucket: {}, local file: {}, S3 key: {}".format(bucket, file, s3_key))
 
         extra_args = {'ACL': s3_acl} if s3_acl else None
-        self.s3.upload_file(file, bucket, s3_key, ExtraArgs=extra_args)
+        try:
+            self.s3.upload_file(file, bucket, s3_key, ExtraArgs=extra_args)
+        except self.s3.Client.exceptions.ExpiredTokenException:
+            self.logger.info("AWS Token expired, refreshing credentials and retrying "
+                             "upload")
+            self.s3 = boto3.client('s3', self.check_and_return_credentials(self.connection_config))
+            self.s3.upload_file(file, bucket, s3_key, ExtraArgs=extra_args)
 
         return s3_key
 
     def delete_from_s3(self, s3_key):
         self.logger.info("Deleting {} from S3".format(s3_key))
         bucket = self.connection_config['s3_bucket']
-        self.s3.delete_object(Bucket=bucket, Key=s3_key)
+        try:
+            self.s3.delete_object(Bucket=bucket, Key=s3_key)
+        except self.s3.Client.exceptions.ExpiredTokenException:
+            self.logger.info("AWS Token expired, refreshing credentials and retrying "
+                             "delete")
+            self.s3 = boto3.client('s3', self.check_and_return_credentials(self.connection_config))
+            self.s3.delete_object(Bucket=bucket, Key=s3_key)
+
 
     # pylint: disable=too-many-locals
     def load_csv(self, s3_key, count, size_bytes, compression=False):
@@ -738,3 +760,48 @@ class DbSync:
         else:
             self.logger.info("Table '{}' exists".format(self.schema_name))
             self.update_columns()
+
+    def check_and_return_credentials(self, settings) -> dict[str, Any]:
+        """Check that boto3 client can assume the desired role."""
+        sts = boto3.client("sts", region_name="us-east-1")
+        role = settings["role_arn"]
+        role_account = role.split(":")[4]
+
+        get_logger().info(f"Assuming {role} in account {role_account}")
+
+        role_session_name = f"{str(uuid.uuid4())}-monad-target-redshift"
+        intermediate_role = sts.assume_role(
+            RoleArn=self.intermediary_role, RoleSessionName=role_session_name
+        )
+
+        get_logger().info(f"Assumed {intermediate_role['AssumedRoleUser']}")
+
+        sts = boto3.client(
+            "sts",
+            aws_access_key_id=intermediate_role["Credentials"]["AccessKeyId"],
+            aws_secret_access_key=intermediate_role["Credentials"]["SecretAccessKey"],
+            aws_session_token=intermediate_role["Credentials"]["SessionToken"],
+            region_name="us-east-1",
+        )
+        assumed_role = sts.assume_role(RoleArn=role, RoleSessionName=role_session_name)
+
+        get_logger().info(f"Assumed {assumed_role['AssumedRoleUser']}")
+
+        sts = boto3.client(
+            "sts",
+            aws_access_key_id=assumed_role["Credentials"]["AccessKeyId"],
+            aws_secret_access_key=assumed_role["Credentials"]["SecretAccessKey"],
+            aws_session_token=assumed_role["Credentials"]["SessionToken"],
+            region_name="us-east-1",
+        )
+
+        identity = sts.get_caller_identity()
+
+        get_logger().info(f"Identity is {identity}")
+
+        assert identity["Account"] == role_account
+        return {
+            "aws_access_key_id": assumed_role["Credentials"]["AccessKeyId"],
+            "aws_secret_access_key": assumed_role["Credentials"]["SecretAccessKey"],
+            "aws_session_token": assumed_role["Credentials"]["SessionToken"],
+        }
