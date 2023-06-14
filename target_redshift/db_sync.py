@@ -13,15 +13,15 @@ import psycopg2
 import psycopg2.extras
 from psycopg2.errors import InternalError_
 
+
 import inflection
 from singer import get_logger
+
 
 DEFAULT_VARCHAR_LENGTH = 65535
 SHORT_VARCHAR_LENGTH = 256
 LONG_VARCHAR_LENGTH = 65535
 MAXIMUM_VARCHAR_LENGTH = 65535
-
-LOGGER = get_logger()
 
 
 def validate_config(config):
@@ -44,8 +44,7 @@ def validate_config(config):
     config_default_target_schema = config.get('default_target_schema', None)
     config_schema_mapping = config.get('schema_mapping', None)
     if not config_default_target_schema and not config_schema_mapping:
-        errors.append(
-            "Neither 'default_target_schema' (string) nor 'schema_mapping' (object) keys set in config.")
+        errors.append("Neither 'default_target_schema' (string) nor 'schema_mapping' (object) keys set in config.")
 
     return errors
 
@@ -110,11 +109,9 @@ def flatten_key(k, parent_key, sep):
     inflected_key = full_key.copy()
     reducer_index = 0
     while len(sep.join(inflected_key)) >= 127 and reducer_index < len(inflected_key):
-        reduced_key = re.sub(r'[a-z]', '',
-                             inflection.camelize(inflected_key[reducer_index]))
+        reduced_key = re.sub(r'[a-z]', '', inflection.camelize(inflected_key[reducer_index]))
         inflected_key[reducer_index] = \
-            (reduced_key if len(reduced_key) > 1 else inflected_key[reducer_index][
-                                                      0:3]).lower()
+            (reduced_key if len(reduced_key) > 1 else inflected_key[reducer_index][0:3]).lower()
         reducer_index += 1
 
     return sep.join(inflected_key)
@@ -130,9 +127,7 @@ def flatten_schema(d, parent_key=[], sep='__', level=0, max_level=0):
         new_key = flatten_key(k, parent_key, sep)
         if 'type' in v.keys():
             if 'object' in v['type'] and 'properties' in v and level < max_level:
-                items.extend(
-                    flatten_schema(v, parent_key + [k], sep=sep, level=level + 1,
-                                   max_level=max_level).items())
+                items.extend(flatten_schema(v, parent_key + [k], sep=sep, level=level+1, max_level=max_level).items())
             else:
                 items.append((new_key, v))
         else:
@@ -159,25 +154,21 @@ def _should_json_dump_value(key, value, flatten_schema=None):
     if isinstance(value, (dict, list)):
         return True
 
-    if flatten_schema and key in flatten_schema and 'type' in flatten_schema[
-        key] and set(flatten_schema[key]['type']) == {'null', 'object', 'array'}:
+    if flatten_schema and key in flatten_schema and 'type' in flatten_schema[key] and set(flatten_schema[key]['type']) == {'null', 'object', 'array'}:
         return True
 
     return False
 
 
-# pylint: disable-msg=too-many-arguments
-def flatten_record(d, flatten_schema=None, parent_key=[], sep='__', level=0,
-                   max_level=0):
+#pylint: disable-msg=too-many-arguments
+def flatten_record(d, flatten_schema=None, parent_key=[], sep='__', level=0, max_level=0):
     items = []
     for k, v in d.items():
         new_key = flatten_key(k, parent_key, sep)
         if isinstance(v, collections.MutableMapping) and level < max_level:
-            items.extend(flatten_record(v, flatten_schema, parent_key + [k], sep=sep,
-                                        level=level + 1, max_level=max_level).items())
+            items.extend(flatten_record(v, flatten_schema, parent_key + [k], sep=sep, level=level + 1, max_level=max_level).items())
         else:
-            items.append((new_key, json.dumps(v) if _should_json_dump_value(k, v,
-                                                                            flatten_schema) else v))
+            items.append((new_key, json.dumps(v) if _should_json_dump_value(k, v, flatten_schema) else v))
     return dict(items)
 
 
@@ -234,33 +225,27 @@ class DbSync:
 
         self.column_size_increase_attempted = False
 
+        # logger to be used across the class's methods
+        self.logger = get_logger('target_redshift')
         self.intermediary_role = connection_config.get('intermediary_role')
         # Initialize assume role and set aws credentials if intermediary role is provided.
         if self.intermediary_role:
             credentials = self.check_and_return_credentials(connection_config)
-            self.connection_config['aws_access_key_id'] = credentials[
-                "aws_access_key_id"]
-            self.connection_config['aws_secret_access_key'] = credentials[
-                "aws_secret_access_key"]
-            self.connection_config['aws_session_token'] = credentials[
-                "aws_session_token"]
+            self.connection_config['aws_access_key_id'] = credentials["aws_access_key_id"]
+            self.connection_config['aws_secret_access_key'] = credentials["aws_secret_access_key"]
+            self.connection_config['aws_session_token'] = credentials["aws_session_token"]
         # Validate connection configuration
         config_errors = validate_config(connection_config)
 
         # Exit if config has errors
         if len(config_errors) != 0:
-            LOGGER.error(
-                "Invalid configuration:\n   * {}".format('\n   * '.join(config_errors)))
+            self.logger.error("Invalid configuration:\n   * {}".format('\n   * '.join(config_errors)))
             sys.exit(1)
 
-        aws_profile = self.connection_config.get('aws_profile') or os.environ.get(
-            'AWS_PROFILE')
-        aws_access_key_id = self.connection_config.get(
-            'aws_access_key_id') or os.environ.get('AWS_ACCESS_KEY_ID')
-        aws_secret_access_key = self.connection_config.get(
-            'aws_secret_access_key') or os.environ.get('AWS_SECRET_ACCESS_KEY')
-        aws_session_token = self.connection_config.get(
-            'aws_session_token') or os.environ.get('AWS_SESSION_TOKEN')
+        aws_profile = self.connection_config.get('aws_profile') or os.environ.get('AWS_PROFILE')
+        aws_access_key_id = self.connection_config.get('aws_access_key_id') or os.environ.get('AWS_ACCESS_KEY_ID')
+        aws_secret_access_key = self.connection_config.get('aws_secret_access_key') or os.environ.get('AWS_SECRET_ACCESS_KEY')
+        aws_session_token = self.connection_config.get('aws_session_token') or os.environ.get('AWS_SESSION_TOKEN')
 
         # Init S3 client
         # Conditionally pass keys as this seems to affect whether instance credentials are correctly loaded if the keys are None
@@ -305,23 +290,18 @@ class DbSync:
             #                                                   }
             #                                               }
             #                                           }
-            config_default_target_schema = self.connection_config.get(
-                'default_target_schema', '').strip()
+            config_default_target_schema = self.connection_config.get('default_target_schema', '').strip()
             config_schema_mapping = self.connection_config.get('schema_mapping', {})
 
             stream_name = stream_schema_message['stream']
-            stream_schema_name = stream_name_to_dict(stream_name)[
-                'schema_name']  # ED NOTES maybe we can just change it here?
+            stream_schema_name = stream_name_to_dict(stream_name)['schema_name']  # ED NOTES maybe we can just change it here?
             if config_schema_mapping and stream_schema_name in config_schema_mapping:
-                self.schema_name = config_schema_mapping[stream_schema_name].get(
-                    'target_schema')
+                self.schema_name = config_schema_mapping[stream_schema_name].get('target_schema')
             elif config_default_target_schema:
                 self.schema_name = config_default_target_schema
 
             if not self.schema_name:
-                raise Exception(
-                    "Target schema name not defined in config. Neither 'default_target_schema' (string) nor 'schema_mapping' (object) defines target schema for {} stream.".format(
-                        stream_name))
+                raise Exception("Target schema name not defined in config. Neither 'default_target_schema' (string) nor 'schema_mapping' (object) defines target schema for {} stream.".format(stream_name))
 
             #  Define grantees
             #  ---------------
@@ -342,16 +322,12 @@ class DbSync:
             #                                                                   }
             #                                                               }
             #                                                           }
-            self.grantees = self.connection_config.get(
-                'default_target_schema_select_permissions')
+            self.grantees = self.connection_config.get('default_target_schema_select_permissions')
             if config_schema_mapping and stream_schema_name in config_schema_mapping:
-                self.grantees = config_schema_mapping[stream_schema_name].get(
-                    'target_schema_select_permissions', self.grantees)
+                self.grantees = config_schema_mapping[stream_schema_name].get('target_schema_select_permissions', self.grantees)
 
-            self.data_flattening_max_level = self.connection_config.get(
-                'data_flattening_max_level', 0)
-            self.flatten_schema = flatten_schema(stream_schema_message['schema'],
-                                                 max_level=self.data_flattening_max_level)
+            self.data_flattening_max_level = self.connection_config.get('data_flattening_max_level', 0)
+            self.flatten_schema = flatten_schema(stream_schema_message['schema'], max_level=self.data_flattening_max_level)
 
     def open_connection(self):
         conn_string = "host='{}' dbname='{}' user='{}' password='{}' port='{}'".format(
@@ -365,7 +341,7 @@ class DbSync:
         return psycopg2.connect(conn_string)
 
     def query(self, query, params=None):
-        LOGGER.debug("Running query: {}".format(query))
+        self.logger.debug("Running query: {}".format(query))
         with self.open_connection() as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                 cur.execute(
@@ -394,30 +370,25 @@ class DbSync:
     def record_primary_key_string(self, record):
         if len(self.stream_schema_message['key_properties']) == 0:
             return None
-        flatten = flatten_record(record, self.flatten_schema,
-                                 max_level=self.data_flattening_max_level)
+        flatten = flatten_record(record, self.flatten_schema, max_level=self.data_flattening_max_level)
         try:
-            key_props = [str(flatten[p]) for p in
-                         self.stream_schema_message['key_properties']]
+            key_props = [str(flatten[p]) for p in self.stream_schema_message['key_properties']]
         except Exception as exc:
-            LOGGER.info("Cannot find {} primary key(s) in record: {}".format(
-                self.stream_schema_message['key_properties'], flatten))
+            self.logger.info("Cannot find {} primary key(s) in record: {}".format(self.stream_schema_message['key_properties'], flatten))
             raise exc
         return ','.join(key_props)
 
     def record_to_csv_line(self, record):
-        flatten = flatten_record(record, self.flatten_schema,
-                                 max_level=self.data_flattening_max_level)
+        flatten = flatten_record(record, self.flatten_schema, max_level=self.data_flattening_max_level)
         return ','.join(
             [
-                json.dumps(flatten[name], ensure_ascii=False) if name in flatten and (
-                            flatten[name] == 0 or flatten[name]) else ''
+                json.dumps(flatten[name], ensure_ascii=False) if name in flatten and (flatten[name] == 0 or flatten[name]) else ''
                 for name in self.flatten_schema
             ]
         )
 
-    def put_to_s3(self, file, stream, count, suffix=""):
-        LOGGER.info("Uploading {} rows to S3".format(count))
+    def put_to_s3(self, file, stream, count, suffix = ""):
+        self.logger.info("Uploading {} rows to S3".format(count))
 
         # Generating key in S3 bucket
         bucket = self.connection_config['s3_bucket']
@@ -425,33 +396,30 @@ class DbSync:
         s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
         s3_key = "{}pipelinewise_{}{}".format(s3_key_prefix, stream, suffix)
 
-        LOGGER.info(
-            "Target S3 bucket: {}, local file: {}, S3 key: {}".format(bucket, file,
-                                                                      s3_key))
+        self.logger.info("Target S3 bucket: {}, local file: {}, S3 key: {}".format(bucket, file, s3_key))
 
         extra_args = {'ACL': s3_acl} if s3_acl else None
         try:
             self.s3.upload_file(file, bucket, s3_key, ExtraArgs=extra_args)
         except self.s3.Client.exceptions.ExpiredTokenException:
-            LOGGER.info("AWS Token expired, refreshing credentials and retrying "
-                        "upload")
-            self.s3 = boto3.client('s3', self.check_and_return_credentials(
-                self.connection_config))
+            self.logger.info("AWS Token expired, refreshing credentials and retrying "
+                             "upload")
+            self.s3 = boto3.client('s3', self.check_and_return_credentials(self.connection_config))
             self.s3.upload_file(file, bucket, s3_key, ExtraArgs=extra_args)
 
         return s3_key
 
     def delete_from_s3(self, s3_key):
-        LOGGER.info("Deleting {} from S3".format(s3_key))
+        self.logger.info("Deleting {} from S3".format(s3_key))
         bucket = self.connection_config['s3_bucket']
         try:
             self.s3.delete_object(Bucket=bucket, Key=s3_key)
         except self.s3.Client.exceptions.ExpiredTokenException:
-            LOGGER.info("AWS Token expired, refreshing credentials and retrying "
-                        "delete")
-            self.s3 = boto3.client('s3', self.check_and_return_credentials(
-                self.connection_config))
+            self.logger.info("AWS Token expired, refreshing credentials and retrying "
+                             "delete")
+            self.s3 = boto3.client('s3', self.check_and_return_credentials(self.connection_config))
             self.s3.delete_object(Bucket=bucket, Key=s3_key)
+
 
     # pylint: disable=too-many-locals
     def load_csv(self, s3_key, count, size_bytes, compression=False):
@@ -460,8 +428,7 @@ class DbSync:
         stage_table = self.table_name(stream, is_stage=True)
         target_table = self.table_name(stream, is_stage=False)
 
-        LOGGER.info("Loading {} rows into {}".format(count, self.table_name(stream,
-                                                                            is_stage=True)))
+        self.logger.info("Loading {} rows into {}".format(count, self.table_name(stream, is_stage=True)))
 
         # Get list if columns with types
         columns_with_trans = [
@@ -484,24 +451,18 @@ class DbSync:
                 # Step 2: Generate copy credentials - prefer role if provided, otherwise use access and secret keys
                 copy_credentials = """
                     iam_role '{aws_role_arn}'
-                """.format(aws_role_arn=self.connection_config[
-                    'aws_redshift_copy_role_arn']) if self.connection_config.get(
-                    "aws_redshift_copy_role_arn") else """
+                """.format(aws_role_arn=self.connection_config['aws_redshift_copy_role_arn']) if self.connection_config.get("aws_redshift_copy_role_arn") else """
                     ACCESS_KEY_ID '{aws_access_key_id}'
                     SECRET_ACCESS_KEY '{aws_secret_access_key}'
                     {aws_session_token}
                 """.format(
                     aws_access_key_id=self.connection_config['aws_access_key_id'],
-                    aws_secret_access_key=self.connection_config[
-                        'aws_secret_access_key'],
-                    aws_session_token="SESSION_TOKEN '{}'".format(
-                        self.connection_config[
-                            'aws_session_token']) if self.connection_config.get(
-                        'aws_session_token') else '',
+                    aws_secret_access_key=self.connection_config['aws_secret_access_key'],
+                    aws_session_token="SESSION_TOKEN '{}'".format(self.connection_config['aws_session_token']) if self.connection_config.get('aws_session_token') else '',
                 )
 
                 # Step 3: Generate copy options - Override defaults from config.json if defined
-                copy_options = self.connection_config.get('copy_options', """
+                copy_options = self.connection_config.get('copy_options',"""
                     EMPTYASNULL BLANKSASNULL TRIMBLANKS TRUNCATECOLUMNS
                     TIMEFORMAT 'auto'
                     COMPUPDATE OFF STATUPDATE OFF
@@ -528,7 +489,7 @@ class DbSync:
                     copy_options=copy_options,
                     compression_option=compression_option
                 )
-                LOGGER.debug("Running query: {}".format(copy_sql))
+                self.logger.debug("Running query: {}".format(copy_sql))
                 cur.execute(copy_sql)
 
                 def load_data():
@@ -544,13 +505,11 @@ class DbSync:
                                 WHERE {}
                             """.format(
                                 target_table,
-                                ', '.join(
-                                    ['{} = s.{}'.format(c['name'], c['name']) for c in
-                                     columns_with_trans]),
+                                ', '.join(['{} = s.{}'.format(c['name'], c['name']) for c in columns_with_trans]),
                                 stage_table,
                                 self.primary_key_merge_condition()
                             )
-                            LOGGER.debug("Running query: {}".format(update_sql))
+                            self.logger.debug("Running query: {}".format(update_sql))
                             cur.execute(update_sql)
                             updates = cur.rowcount
 
@@ -563,16 +522,13 @@ class DbSync:
                         """.format(
                             target_table,
                             ', '.join([c['name'] for c in columns_with_trans]),
-                            ', '.join(
-                                ['s.{}'.format(c['name']) for c in columns_with_trans]),
+                            ', '.join(['s.{}'.format(c['name']) for c in columns_with_trans]),
                             stage_table,
                             target_table,
                             self.primary_key_merge_condition(),
-                            ' AND '.join(
-                                ['{}.{} IS NULL'.format(target_table, c) for c in
-                                 primary_column_names(stream_schema_message)])
+                            ' AND '.join(['{}.{} IS NULL'.format(target_table, c) for c in primary_column_names(stream_schema_message)])
                         )
-                        LOGGER.debug("Running query: {}".format(insert_sql))
+                        self.logger.debug("Running query: {}".format(insert_sql))
                         cur.execute(insert_sql)
                         inserts = cur.rowcount
 
@@ -584,11 +540,10 @@ class DbSync:
                         """.format(
                             target_table,
                             ', '.join([c['name'] for c in columns_with_trans]),
-                            ', '.join(
-                                ['s.{}'.format(c['name']) for c in columns_with_trans]),
+                            ', '.join(['s.{}'.format(c['name']) for c in columns_with_trans]),
                             stage_table
                         )
-                        LOGGER.debug("Running query: {}".format(insert_sql))
+                        self.logger.debug("Running query: {}".format(insert_sql))
                         cur.execute(insert_sql)
                         inserts = cur.rowcount
 
@@ -596,11 +551,11 @@ class DbSync:
                     load_data()
                 except InternalError_ as exc:
                     if (
-                            "Value too long for character type" in repr(exc)
-                            and not self.column_size_increase_attempted
+                        "Value too long for character type" in repr(exc)
+                        and not self.column_size_increase_attempted
                     ):
-                        LOGGER.error("Value too long for character type.")
-                        LOGGER.error(
+                        self.logger.error("Value too long for character type.")
+                        self.logger.error(
                             "Will try to increase the size of all varchar columns"
                         )
                         try:
@@ -608,26 +563,25 @@ class DbSync:
                                 target_table, self.schema_name
                             )
                         except Exception as exc:
-                            LOGGER.error(
+                            self.logger.error(
                                 f"Error running columns size increase: {exc}"
                             )
                         finally:
                             self.column_size_increase_attempted = True
 
-                        LOGGER.info(
+                        self.logger.info(
                             "Trying again after column size increase attempt"
                         )
                         load_data()
                     else:
                         raise exc
 
-                        # Step 6: Drop stage table
+                # Step 6: Drop stage table
                 cur.execute(self.drop_table_query(is_stage=True))
 
-                LOGGER.info('Loading into {}: {}'.format(
+                self.logger.info('Loading into {}: {}'.format(
                     self.table_name(stream, False),
-                    json.dumps({'inserts': inserts, 'updates': updates,
-                                'size_bytes': size_bytes})))
+                    json.dumps({'inserts': inserts, 'updates': updates, 'size_bytes': size_bytes})))
 
     def _increase_all_varchar_columns_to_max_size(self, table: str, schema: str):
         """
@@ -648,11 +602,11 @@ class DbSync:
         """
         with self.open_connection() as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
-                LOGGER.info(f"Running: {column_query}")
+                self.logger.info(f"Running: {column_query}")
                 cur.execute(column_query)
                 column_names = [row[0] for row in cur.fetchall()]
                 if len(column_names) > 0:
-                    LOGGER.info(
+                    self.logger.info(
                         (
                             "Will try to increase the size of the following "
                             f"columns to {MAXIMUM_VARCHAR_LENGTH}: {column_names}"
@@ -673,26 +627,25 @@ class DbSync:
                             ALTER COLUMN {column} TYPE 
                             character varying({MAXIMUM_VARCHAR_LENGTH});
                             """
-                            LOGGER.info(f"Running: {alter_query}")
+                            self.logger.info(f"Running: {alter_query}")
                             cur.execute(alter_query)
-                            LOGGER.info(f"Increased size for: {column}")
+                            self.logger.info(f"Increased size for: {column}")
 
                         except:
-                            LOGGER.info(
+                            self.logger.info(
                                 (
                                     f"Failed to increase size of column {column}. "
                                     "Will continue with other columns."
                                 )
                             )
                 else:
-                    LOGGER.info("All varchar columns are already at maximum size.")
+                    self.logger.info("All varchar columns are already at maximum size.")
 
     def primary_key_merge_condition(self):
         stream_schema_message = self.stream_schema_message
         names = primary_column_names(stream_schema_message)
         return ' AND '.join(['{}.{} = s.{}'.format(
-            self.table_name(stream_schema_message['stream'], False), c, c) for c in
-            names])
+            self.table_name(stream_schema_message['stream'], False), c, c) for c in names])
 
     def column_names(self):
         return [safe_column_name(name) for name in self.flatten_schema]
@@ -707,8 +660,7 @@ class DbSync:
             for (name, schema) in self.flatten_schema.items()
         ]
 
-        primary_key = ["PRIMARY KEY ({})".format(
-            ', '.join(primary_column_names(stream_schema_message)))] \
+        primary_key = ["PRIMARY KEY ({})".format(', '.join(primary_column_names(stream_schema_message)))] \
             if len(stream_schema_message['key_properties']) else []
 
         return "CREATE TABLE IF NOT EXISTS {} ({})".format(
@@ -718,33 +670,24 @@ class DbSync:
 
     def drop_table_query(self, is_stage=False):
         stream_schema_message = self.stream_schema_message
-        return "DROP TABLE IF EXISTS {}".format(
-            self.table_name(stream_schema_message['stream'], is_stage))
+        return "DROP TABLE IF EXISTS {}".format(self.table_name(stream_schema_message['stream'], is_stage))
 
     def grant_usage_on_schema(self, schema_name, grantee, to_group=False):
-        query = "GRANT USAGE ON SCHEMA {} TO {} {}".format(schema_name,
-                                                           'GROUP' if to_group else '',
-                                                           grantee)
-        LOGGER.info(
-            "Granting USAGE privilege on '{}' schema to '{}'... {}".format(schema_name,
-                                                                           grantee,
-                                                                           query))
+        query = "GRANT USAGE ON SCHEMA {} TO {} {}".format(schema_name, 'GROUP' if to_group else '', grantee)
+        self.logger.info("Granting USAGE privilege on '{}' schema to '{}'... {}".format(schema_name, grantee, query))
         self.query(query)
 
-    def grant_select_on_all_tables_in_schema(self, schema_name, grantee,
-                                             to_group=False):
-        query = "GRANT SELECT ON ALL TABLES IN SCHEMA '{}' TO '{}' '{}'".format(
-            schema_name, 'GROUP' if to_group else '', grantee)
-        LOGGER.info(
-            "Granting SELECT ON ALL TABLES privilegue on '{}' schema to '{}'... {}".format(
-                schema_name, grantee, query))
+    def grant_select_on_all_tables_in_schema(self, schema_name, grantee, to_group=False):
+        query = "GRANT SELECT ON ALL TABLES IN SCHEMA '{}' TO '{}' '{}'".format(schema_name, 'GROUP' if to_group else '', grantee)
+        self.logger.info(
+            "Granting SELECT ON ALL TABLES privilegue on '{}' schema to '{}'... {}".format(schema_name, grantee, query))
         self.query(query)
 
     @classmethod
     def grant_privilege(self, schema, grantees, grant_method, to_group=False):
         if isinstance(grantees, list):
             for grantee in grantees:
-                grant_method(schema, grantee, to_group)
+                grant_method(schema, grantee,to_group)
         elif isinstance(grantees, str):
             grant_method(schema, grantees, to_group)
         elif isinstance(grantees, dict):
@@ -757,8 +700,8 @@ class DbSync:
     def delete_rows(self, stream):
         table = self.table_name(stream, is_stage=False)
         query = "DELETE FROM {} WHERE _sdc_deleted_at IS NOT NULL".format(table)
-        LOGGER.info("Deleting rows from '{}' table... {}".format(table, query))
-        LOGGER.info("DELETE {}".format(len(self.query(query))))
+        self.logger.info("Deleting rows from '{}' table... {}".format(table, query))
+        self.logger.info("DELETE {}".format(len(self.query(query))))
 
     def create_schema_if_not_exists(self):
         schema_name = f'"{self.schema_name}"'
@@ -766,9 +709,7 @@ class DbSync:
 
         # table_columns_cache is an optional pre-collected list of available objects in redshift
         if self.table_cache:
-            schema_rows = list(
-                filter(lambda x: x['table_schema'] == schema_name.lower(),
-                       self.table_cache))
+            schema_rows = list(filter(lambda x: x['table_schema'] == schema_name.lower(), self.table_cache))
         # Query realtime if not pre-collected
         else:
             schema_rows = self.query(
@@ -778,35 +719,29 @@ class DbSync:
 
         if len(schema_rows) == 0:
             query = "CREATE SCHEMA IF NOT EXISTS {}".format(schema_name)
-            LOGGER.info(
-                'Schema {} does not exist. Creating... {}'.format(schema_name, query))
+            self.logger.info('Schema {} does not exist. Creating... {}'.format(schema_name, query))
             self.query(query)
 
             self.grant_privilege(schema_name, self.grantees, self.grant_usage_on_schema)
 
             # Refresh columns cache if required
             if self.table_cache:
-                self.table_cache = self.get_table_columns(
-                    filter_schemas=[self.schema_name])
+                self.table_cache = self.get_table_columns(filter_schemas=[self.schema_name])
 
     def get_tables(self, table_schema=None):
         return self.query("""SELECT LOWER(table_schema) table_schema, LOWER(table_name) table_name
             FROM information_schema.tables
             WHERE LOWER(table_schema) = '{}'""".format(
-            "LOWER(table_schema)" if table_schema is None else "{}".format(
-                table_schema.lower())
+                "LOWER(table_schema)" if table_schema is None else "{}".format(table_schema.lower())
         ))
 
-    def get_table_columns(self, table_schema=None, table_name=None,
-                          filter_schemas=None):
+    def get_table_columns(self, table_schema=None, table_name=None, filter_schemas=None):
         sql = """SELECT LOWER(c.table_schema) table_schema, LOWER(c.table_name) table_name, c.column_name, c.data_type
             FROM information_schema.columns c
             WHERE 1=1"""
         if table_schema is not None: sql = sql + " AND LOWER(c.table_schema) = '" + table_schema.lower() + "'"
-        if table_name is not None: sql = sql + " AND LOWER(c.table_name) = '" + table_name.replace(
-            "\"", "").lower() + "'"
-        if filter_schemas is not None: sql = sql + " AND LOWER(c.table_schema) IN (" + ', '.join(
-            "'{}'".format(s).lower() for s in filter_schemas) + ")"
+        if table_name is not None: sql = sql + " AND LOWER(c.table_name) = '" + table_name.replace("\"", "").lower() + "'"
+        if filter_schemas is not None: sql = sql + " AND LOWER(c.table_schema) IN (" + ', '.join("'{}'".format(s).lower() for s in filter_schemas) + ")"
         return self.query(sql)
 
     def update_columns(self):
@@ -815,10 +750,9 @@ class DbSync:
         table_name = self.table_name(stream, is_stage=False, without_schema=True)
 
         if self.table_cache:
-            columns = list(
-                filter(lambda x: x['table_schema'] == self.schema_name.lower() and
-                                 f'"{x["table_name"].upper()}"' == table_name,
-                       self.table_cache))
+            columns = list(filter(lambda x: x['table_schema'] == self.schema_name.lower() and
+                                            f'"{x["table_name"].upper()}"' == table_name,
+                                  self.table_cache))
         else:
             columns = self.get_table_columns(self.schema_name, table_name)
 
@@ -843,8 +777,7 @@ class DbSync:
             ))
             for (name, properties_schema) in self.flatten_schema.items()
             if name.lower() in columns_dict and
-               columns_dict[name.lower()]['data_type'].lower() != column_type(
-                properties_schema, with_length=False).lower() and
+               columns_dict[name.lower()]['data_type'].lower() != column_type(properties_schema, with_length=False).lower() and
 
                # Don't alter table if 'timestamp without time zone' detected as the new required column type
                #
@@ -869,64 +802,55 @@ class DbSync:
             self.table_cache = self.get_table_columns(filter_schemas=[self.schema_name])
 
     def drop_column(self, column_name, stream):
-        drop_column = "ALTER TABLE {} DROP COLUMN {}".format(
-            self.table_name(stream, is_stage=False), column_name)
-        LOGGER.info('Dropping column: {}'.format(drop_column))
+        drop_column = "ALTER TABLE {} DROP COLUMN {}".format(self.table_name(stream, is_stage=False), column_name)
+        self.logger.info('Dropping column: {}'.format(drop_column))
         self.query(drop_column)
 
     def version_column(self, column_name, stream):
-        version_column = "ALTER TABLE {} RENAME COLUMN {} TO \"{}_{}\"".format(
-            self.table_name(stream, is_stage=False),
-            column_name,
-            column_name.replace("\"", ""),
-            time.strftime("%Y%m%d_%H%M"))
-        LOGGER.info('Versioning column: {}'.format(version_column))
+        version_column = "ALTER TABLE {} RENAME COLUMN {} TO \"{}_{}\"".format(self.table_name(stream, is_stage=False),
+                                                                               column_name,
+                                                                               column_name.replace("\"", ""),
+                                                                               time.strftime("%Y%m%d_%H%M"))
+        self.logger.info('Versioning column: {}'.format(version_column))
         self.query(version_column)
 
     def add_column(self, column, stream):
-        add_column = "ALTER TABLE {} ADD COLUMN {}".format(
-            self.table_name(stream, is_stage=False), column)
-        LOGGER.info('Adding column: {}'.format(add_column))
+        add_column = "ALTER TABLE {} ADD COLUMN {}".format(self.table_name(stream, is_stage=False), column)
+        self.logger.info('Adding column: {}'.format(add_column))
         self.query(add_column)
 
     def create_table(self, is_stage=False):
         stream_schema_message = self.stream_schema_message
         stream = stream_schema_message['stream']
-        LOGGER.info(
-            "(Re)creating '{}' table...".format(self.table_name(stream, is_stage)))
+        self.logger.info("(Re)creating '{}' table...".format(self.table_name(stream, is_stage)))
 
         self.query(self.drop_table_query(is_stage=is_stage))
         self.query(self.create_table_query(is_stage=is_stage))
 
     def create_table_and_grant_privilege(self, is_stage=False):
         self.create_table(is_stage=is_stage)
-        self.grant_privilege(self.schema_name, self.grantees,
-                             self.grant_select_on_all_tables_in_schema)
+        self.grant_privilege(self.schema_name, self.grantees, self.grant_select_on_all_tables_in_schema)
 
     def sync_table(self):
         stream_schema_message = self.stream_schema_message
         stream = stream_schema_message['stream']
         table_name = self.table_name(stream, is_stage=False, without_schema=True)
-        table_name_with_schema = self.table_name(stream, is_stage=False,
-                                                 without_schema=False)
+        table_name_with_schema = self.table_name(stream, is_stage=False, without_schema=False)
 
         if self.table_cache:
-            found_tables = list(
-                filter(lambda x: x['table_schema'] == self.schema_name.lower() and
-                                 f'"{x["table_name"].upper()}"' == table_name,
-                       self.table_cache))
+            found_tables = list(filter(lambda x: x['table_schema'] == self.schema_name.lower() and
+                                                 f'"{x["table_name"].upper()}"' == table_name,
+                                       self.table_cache))
         else:
-            found_tables = [table for table in
-                            (self.get_tables(self.schema_name.lower()))
+            found_tables = [table for table in (self.get_tables(self.schema_name.lower()))
                             if f'"{table["table_name"].upper()}"' == table_name]
 
         # Create target table if not exists
         if len(found_tables) == 0:
-            LOGGER.info(
-                "Table '{}' does not exist. Creating...".format(table_name_with_schema))
+            self.logger.info("Table '{}' does not exist. Creating...".format(table_name_with_schema))
             self.create_table_and_grant_privilege()
         else:
-            LOGGER.info("Table '{}' exists".format(self.schema_name))
+            self.logger.info("Table '{}' exists".format(self.schema_name))
             self.update_columns()
 
     def check_and_return_credentials(self, settings) -> dict[str, Any]:
