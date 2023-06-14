@@ -596,7 +596,7 @@ class DbSync:
         SELECT column_name 
         FROM information_schema.columns 
         WHERE table_schema = '{schema}'
-        AND table_name = '{table}' 
+        AND table_name = '{table.split('"')[-2].lower()}' 
         AND data_type = 'character varying' 
         AND character_maximum_length <> {MAXIMUM_VARCHAR_LENGTH}         
         """
