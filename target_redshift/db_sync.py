@@ -11,6 +11,8 @@ from typing import Any
 import boto3
 import psycopg2
 import psycopg2.extras
+from psycopg2.errors import InternalError_
+
 
 import inflection
 from singer import get_logger
@@ -19,6 +21,7 @@ from singer import get_logger
 DEFAULT_VARCHAR_LENGTH = 65535
 SHORT_VARCHAR_LENGTH = 256
 LONG_VARCHAR_LENGTH = 65535
+MAXIMUM_VARCHAR_LENGTH = 65535
 
 
 def validate_config(config):
@@ -220,6 +223,7 @@ class DbSync:
         self.stream_schema_message = stream_schema_message
         self.table_cache = table_cache
 
+        self.column_size_increase_attempted = False
 
         # logger to be used across the class's methods
         self.logger = get_logger('target_redshift')
@@ -488,59 +492,87 @@ class DbSync:
                 self.logger.debug("Running query: {}".format(copy_sql))
                 cur.execute(copy_sql)
 
-                # Step 5/a: Insert or Update if primary key defined
-                #           Do UPDATE first and second INSERT to calculate
-                #           the number of affected rows correctly
-                if len(stream_schema_message['key_properties']) > 0:
-                    # Step 5/a/1: Update existing records
-                    if not self.skip_updates:
-                        update_sql = """UPDATE {}
-                            SET {}
-                            FROM {} s
+                def load_data():
+                    # Step 5/a: Insert or Update if primary key defined
+                    #           Do UPDATE first and second INSERT to calculate
+                    #           the number of affected rows correctly
+                    if len(stream_schema_message['key_properties']) > 0:
+                        # Step 5/a/1: Update existing records
+                        if not self.skip_updates:
+                            update_sql = """UPDATE {}
+                                SET {}
+                                FROM {} s
+                                WHERE {}
+                            """.format(
+                                target_table,
+                                ', '.join(['{} = s.{}'.format(c['name'], c['name']) for c in columns_with_trans]),
+                                stage_table,
+                                self.primary_key_merge_condition()
+                            )
+                            self.logger.debug("Running query: {}".format(update_sql))
+                            cur.execute(update_sql)
+                            updates = cur.rowcount
+
+                        # Step 5/a/2: Insert new records
+                        insert_sql = """INSERT INTO {} ({})
+                            SELECT {}
+                            FROM {} s LEFT JOIN {}
+                            ON {}
                             WHERE {}
                         """.format(
                             target_table,
-                            ', '.join(['{} = s.{}'.format(c['name'], c['name']) for c in columns_with_trans]),
+                            ', '.join([c['name'] for c in columns_with_trans]),
+                            ', '.join(['s.{}'.format(c['name']) for c in columns_with_trans]),
                             stage_table,
-                            self.primary_key_merge_condition()
+                            target_table,
+                            self.primary_key_merge_condition(),
+                            ' AND '.join(['{}.{} IS NULL'.format(target_table, c) for c in primary_column_names(stream_schema_message)])
                         )
-                        self.logger.debug("Running query: {}".format(update_sql))
-                        cur.execute(update_sql)
-                        updates = cur.rowcount
+                        self.logger.debug("Running query: {}".format(insert_sql))
+                        cur.execute(insert_sql)
+                        inserts = cur.rowcount
 
-                    # Step 5/a/2: Insert new records
-                    insert_sql = """INSERT INTO {} ({})
-                        SELECT {}
-                        FROM {} s LEFT JOIN {}
-                        ON {}
-                        WHERE {}
-                    """.format(
-                        target_table,
-                        ', '.join([c['name'] for c in columns_with_trans]),
-                        ', '.join(['s.{}'.format(c['name']) for c in columns_with_trans]),
-                        stage_table,
-                        target_table,
-                        self.primary_key_merge_condition(),
-                        ' AND '.join(['{}.{} IS NULL'.format(target_table, c) for c in primary_column_names(stream_schema_message)])
-                    )
-                    self.logger.debug("Running query: {}".format(insert_sql))
-                    cur.execute(insert_sql)
-                    inserts = cur.rowcount
+                    # Step 5/b: Insert only if no primary key
+                    else:
+                        insert_sql = """INSERT INTO {} ({})
+                            SELECT {}
+                            FROM {} s
+                        """.format(
+                            target_table,
+                            ', '.join([c['name'] for c in columns_with_trans]),
+                            ', '.join(['s.{}'.format(c['name']) for c in columns_with_trans]),
+                            stage_table
+                        )
+                        self.logger.debug("Running query: {}".format(insert_sql))
+                        cur.execute(insert_sql)
+                        inserts = cur.rowcount
 
-                # Step 5/b: Insert only if no primary key
-                else:
-                    insert_sql = """INSERT INTO {} ({})
-                        SELECT {}
-                        FROM {} s
-                    """.format(
-                        target_table,
-                        ', '.join([c['name'] for c in columns_with_trans]),
-                        ', '.join(['s.{}'.format(c['name']) for c in columns_with_trans]),
-                        stage_table
-                    )
-                    self.logger.debug("Running query: {}".format(insert_sql))
-                    cur.execute(insert_sql)
-                    inserts = cur.rowcount
+                try:
+                    load_data()
+                except InternalError_ as exc:
+                    if (
+                        "Value too long for character type" in repr(exc)
+                        and not self.column_size_increase_attempted
+                    ):
+                        self.logger.error("Value too long for character type.")
+                        self.logger.error(
+                            "Will try to increase the size of all varchar columns"
+                        )
+                        try:
+                            self._increase_all_varchar_columns_to_max_size(
+                                target_table, self.schema_name
+                            )
+                        except Exception as exc:
+                            self.logger.error(
+                                f"Error running columns size increase: {exc}"
+                            )
+                        finally:
+                            self.column_size_increase_attempted = True
+
+                        self.logger.info(
+                            "Trying again after column size increase attempt"
+                        )
+                        load_data()                
 
                 # Step 6: Drop stage table
                 cur.execute(self.drop_table_query(is_stage=True))
@@ -548,6 +580,65 @@ class DbSync:
                 self.logger.info('Loading into {}: {}'.format(
                     self.table_name(stream, False),
                     json.dumps({'inserts': inserts, 'updates': updates, 'size_bytes': size_bytes})))
+    
+    def _increase_all_varchar_columns_to_max_size(self, table: str, schema: str):
+        """
+        Try to increase all VARCHAR columns to the maximum size allowed by Redshift.
+        This is a workaround for the following error:
+        ```
+        ERROR:  value too long for type character varying(...)
+        ```
+        """
+        # Get all VARCHAR column names that are not already at the maximum size
+        column_query = f"""
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_schema = '{schema}'
+        AND table_name = '{table}' 
+        AND data_type = 'character varying' 
+        AND character_maximum_length <> {MAXIMUM_VARCHAR_LENGTH}         
+        """
+        with self.open_connection() as connection:
+            with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                self.logger.info(f"Running: {column_query}")
+                cur.execute(column_query)
+                column_names = [row[0] for row in cur.fetchall()]
+                if len(column_names) > 0:
+                    self.logger.info(
+                        (
+                            "Will try to increase the size of the following "
+                            f"columns to {MAXIMUM_VARCHAR_LENGTH}: {column_names}"
+                        )
+                    )
+
+                    for column in column_names:
+                        # A column cannot always be resized, for example if they are
+                        # a DISTKEY or uses a certain type of compression algorithm.
+                        # Try to increase the size of each column individually and if
+                        # one of them fails, continue with the next one as it is not a
+                        # dealbreaker.
+                        # In almost all cases, the columns that cause size problems
+                        # are not set up as DISTKEYs.
+                        try:
+                            alter_query = f"""
+                            ALTER TABLE {schema}.{table}
+                            ALTER COLUMN {column} TYPE 
+                            character varying({MAXIMUM_VARCHAR_LENGTH});
+                            """
+                            self.logger.info(f"Running: {alter_query}")
+                            cur.execute(alter_query)
+                            self.logger.info(f"Increased size for: {column}")
+
+                        except:
+                            self.logger.info(
+                                (
+                                    f"Failed to increase size of column {column}. "
+                                    "Will continue with other columns."
+                                )
+                            )
+                            continue
+                else:
+                    self.logger.info("All varchar columns are already at maximum size.")
 
     def primary_key_merge_condition(self):
         stream_schema_message = self.stream_schema_message
