@@ -340,6 +340,18 @@ class DbSync:
 
         return psycopg2.connect(conn_string)
 
+    def open_non_transactional_connection(self):
+        conn_string = "host='{}' dbname='{}' user='{}' password='{}' port='{}' options='{}'".format(
+            self.connection_config['host'],
+            self.connection_config['dbname'],
+            self.connection_config['user'],
+            self.connection_config['password'],
+            self.connection_config['port'],
+            '-c autocommit=on'
+        )
+
+        return psycopg2.connect(conn_string)
+
     def query(self, query, params=None):
         self.logger.debug("Running query: {}".format(query))
         with self.open_connection() as connection:
@@ -625,16 +637,18 @@ class DbSync:
                         # In almost all cases, the columns that cause size problems
                         # are not set up as DISTKEYs.
                         try:
-                            connection.set_session(autocommit=True)
-                            alter_query = f"""
-                            ALTER TABLE {schema}.{table}
-                            ALTER COLUMN {column} TYPE 
-                            character varying({MAXIMUM_VARCHAR_LENGTH});
-                            """
-                            self.logger.info(f"Running: {alter_query}")
-                            cur.execute(alter_query)
-                            self.logger.info(f"Increased size for: {column}")
-                            connection.set_session(autocommit=False)
+                            with self.open_non_transactional_connection() as non_transactional_connection:
+                                with non_transactional_connection.cursor(
+                                    cursor_factory=psycopg2.extras.DictCursor
+                                ) as non_transactional_cur:
+                                    alter_query = f"""
+                                    ALTER TABLE {schema}.{table}
+                                    ALTER COLUMN {column} TYPE 
+                                    character varying({MAXIMUM_VARCHAR_LENGTH});
+                                    """
+                                    self.logger.info(f"Running: {alter_query}")
+                                    non_transactional_cur.execute(alter_query)
+                                    self.logger.info(f"Increased size for: {column}")
                         except Exception as error:
                             self.logger.info(
                                 (
