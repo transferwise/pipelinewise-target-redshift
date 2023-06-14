@@ -638,7 +638,6 @@ class DbSync:
                                     "Will continue with other columns."
                                 )
                             )
-                            continue
                 else:
                     self.logger.info("All varchar columns are already at maximum size.")
 
