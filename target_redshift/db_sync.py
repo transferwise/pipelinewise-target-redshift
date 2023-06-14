@@ -592,6 +592,8 @@ class DbSync:
         ERROR:  value too long for type character varying(...)
         ```
         """
+        # Remove quotes and convert to lowercase
+        table = table.replace('"', '').lower()
         # Get all VARCHAR column names that are not already at the maximum size
         column_query = f"""
         SELECT column_name 
