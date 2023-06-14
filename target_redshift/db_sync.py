@@ -625,17 +625,16 @@ class DbSync:
                         # In almost all cases, the columns that cause size problems
                         # are not set up as DISTKEYs.
                         try:
-                            # Create new cursor object
-                            with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as alter_cursor:
-                                alter_query = f"""
-                                ALTER TABLE {schema}.{table}
-                                ALTER COLUMN {column} TYPE 
-                                character varying({MAXIMUM_VARCHAR_LENGTH});
-                                """
-                                self.logger.info(f"Running: {alter_query}")
-                                alter_cursor.execute(alter_query)
-                                self.logger.info(f"Increased size for: {column}")
-                                connection.commit()
+                            connection.set_session(autocommit=True)
+                            alter_query = f"""
+                            ALTER TABLE {schema}.{table}
+                            ALTER COLUMN {column} TYPE 
+                            character varying({MAXIMUM_VARCHAR_LENGTH});
+                            """
+                            self.logger.info(f"Running: {alter_query}")
+                            cur.execute(alter_query)
+                            self.logger.info(f"Increased size for: {column}")
+                            connection.set_session(autocommit=False)
                         except Exception as error:
                             self.logger.info(
                                 (
