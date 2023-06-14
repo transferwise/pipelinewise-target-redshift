@@ -572,7 +572,9 @@ class DbSync:
                         self.logger.info(
                             "Trying again after column size increase attempt"
                         )
-                        load_data()                
+                        load_data()
+                    else: 
+                        raise exc                
 
                 # Step 6: Drop stage table
                 cur.execute(self.drop_table_query(is_stage=True))
