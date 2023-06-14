@@ -625,6 +625,7 @@ class DbSync:
                         # In almost all cases, the columns that cause size problems
                         # are not set up as DISTKEYs.
                         try:
+                            connection.autocommit = True
                             alter_query = f"""
                             ALTER TABLE {schema}.{table}
                             ALTER COLUMN {column} TYPE 
@@ -633,7 +634,7 @@ class DbSync:
                             self.logger.info(f"Running: {alter_query}")
                             cur.execute(alter_query)
                             self.logger.info(f"Increased size for: {column}")
-
+                            connection.autocommit = False
                         except Exception as error:
                             self.logger.info(
                                 (
