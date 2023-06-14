@@ -427,6 +427,7 @@ class DbSync:
         stream = stream_schema_message['stream']
         stage_table = self.table_name(stream, is_stage=True)
         target_table = self.table_name(stream, is_stage=False)
+        target_table_no_schema = self.table_name(stream, is_stage=False, without_schema=True)
 
         self.logger.info("Loading {} rows into {}".format(count, self.table_name(stream, is_stage=True)))
 
@@ -560,7 +561,7 @@ class DbSync:
                         )
                         try:
                             self._increase_all_varchar_columns_to_max_size(
-                                target_table, self.schema_name
+                                target_table_no_schema, self.schema_name
                             )
                         except Exception as exc:
                             self.logger.error(
@@ -596,7 +597,7 @@ class DbSync:
         SELECT column_name 
         FROM information_schema.columns 
         WHERE table_schema = '{schema}'
-        AND table_name = '{table.split('"')[-2].lower()}' 
+        AND table_name = '{table}' 
         AND data_type = 'character varying' 
         AND character_maximum_length <> {MAXIMUM_VARCHAR_LENGTH}         
         """
@@ -623,7 +624,7 @@ class DbSync:
                         # are not set up as DISTKEYs.
                         try:
                             alter_query = f"""
-                            ALTER TABLE {schema}.{table.split('"')[-2].lower()}
+                            ALTER TABLE {schema}.{table}
                             ALTER COLUMN {column} TYPE 
                             character varying({MAXIMUM_VARCHAR_LENGTH});
                             """
@@ -631,11 +632,11 @@ class DbSync:
                             cur.execute(alter_query)
                             self.logger.info(f"Increased size for: {column}")
 
-                        except:
+                        except Exception as error:
                             self.logger.info(
                                 (
                                     f"Failed to increase size of column {column}. "
-                                    "Will continue with other columns."
+                                    f"Will continue with other columns. Error: {error}"
                                 )
                             )
                 else:
