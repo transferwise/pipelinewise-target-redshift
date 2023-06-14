@@ -635,6 +635,7 @@ class DbSync:
                                 self.logger.info(f"Running: {alter_query}")
                                 alter_cursor.execute(alter_query)
                                 self.logger.info(f"Increased size for: {column}")
+                                connection.commit()
                         except Exception as error:
                             self.logger.info(
                                 (
