@@ -623,7 +623,7 @@ class DbSync:
                         # are not set up as DISTKEYs.
                         try:
                             alter_query = f"""
-                            ALTER TABLE {schema}.{table}
+                            ALTER TABLE {schema}.{table.split('"')[-2].lower()}
                             ALTER COLUMN {column} TYPE 
                             character varying({MAXIMUM_VARCHAR_LENGTH});
                             """
