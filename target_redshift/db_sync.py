@@ -446,7 +446,7 @@ class DbSync:
             for (name, schema) in self.flatten_schema.items()
         ]
 
-        def move_data():
+        def load_data():
             with self.open_connection() as connection:
                 with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                     inserts = 0
@@ -500,66 +500,69 @@ class DbSync:
                     self.logger.debug("Running query: {}".format(copy_sql))
                     cur.execute(copy_sql)
 
-                    def load_data():
-                        # Step 5/a: Insert or Update if primary key defined
-                        #           Do UPDATE first and second INSERT to calculate
-                        #           the number of affected rows correctly
-                        if len(stream_schema_message['key_properties']) > 0:
-                            # Step 5/a/1: Update existing records
-                            if not self.skip_updates:
-                                update_sql = """UPDATE {}
-                                    SET {}
-                                    FROM {} s
-                                    WHERE {}
-                                """.format(
-                                    target_table,
-                                    ', '.join(['{} = s.{}'.format(c['name'], c['name']) for c in columns_with_trans]),
-                                    stage_table,
-                                    self.primary_key_merge_condition()
-                                )
-                                self.logger.debug("Running query: {}".format(update_sql))
-                                cur.execute(update_sql)
-                                updates = cur.rowcount
-
-                            # Step 5/a/2: Insert new records
-                            insert_sql = """INSERT INTO {} ({})
-                                SELECT {}
-                                FROM {} s LEFT JOIN {}
-                                ON {}
+                    # Step 5/a: Insert or Update if primary key defined
+                    #           Do UPDATE first and second INSERT to calculate
+                    #           the number of affected rows correctly
+                    if len(stream_schema_message['key_properties']) > 0:
+                        # Step 5/a/1: Update existing records
+                        if not self.skip_updates:
+                            update_sql = """UPDATE {}
+                                SET {}
+                                FROM {} s
                                 WHERE {}
                             """.format(
                                 target_table,
-                                ', '.join([c['name'] for c in columns_with_trans]),
-                                ', '.join(['s.{}'.format(c['name']) for c in columns_with_trans]),
+                                ', '.join(['{} = s.{}'.format(c['name'], c['name']) for c in columns_with_trans]),
                                 stage_table,
-                                target_table,
-                                self.primary_key_merge_condition(),
-                                ' AND '.join(['{}.{} IS NULL'.format(target_table, c) for c in primary_column_names(stream_schema_message)])
+                                self.primary_key_merge_condition()
                             )
-                            self.logger.debug("Running query: {}".format(insert_sql))
-                            cur.execute(insert_sql)
-                            inserts = cur.rowcount
+                            self.logger.debug("Running query: {}".format(update_sql))
+                            cur.execute(update_sql)
+                            updates = cur.rowcount
 
-                        # Step 5/b: Insert only if no primary key
-                        else:
-                            insert_sql = """INSERT INTO {} ({})
-                                SELECT {}
-                                FROM {} s
-                            """.format(
-                                target_table,
-                                ', '.join([c['name'] for c in columns_with_trans]),
-                                ', '.join(['s.{}'.format(c['name']) for c in columns_with_trans]),
-                                stage_table
-                            )
-                            self.logger.debug("Running query: {}".format(insert_sql))
-                            cur.execute(insert_sql)
-                            inserts = cur.rowcount
-        
+                        # Step 5/a/2: Insert new records
+                        insert_sql = """INSERT INTO {} ({})
+                            SELECT {}
+                            FROM {} s LEFT JOIN {}
+                            ON {}
+                            WHERE {}
+                        """.format(
+                            target_table,
+                            ', '.join([c['name'] for c in columns_with_trans]),
+                            ', '.join(['s.{}'.format(c['name']) for c in columns_with_trans]),
+                            stage_table,
+                            target_table,
+                            self.primary_key_merge_condition(),
+                            ' AND '.join(['{}.{} IS NULL'.format(target_table, c) for c in primary_column_names(stream_schema_message)])
+                        )
+                        self.logger.debug("Running query: {}".format(insert_sql))
+                        cur.execute(insert_sql)
+                        inserts = cur.rowcount
+
+                    # Step 5/b: Insert only if no primary key
+                    else:
+                        insert_sql = """INSERT INTO {} ({})
+                            SELECT {}
+                            FROM {} s
+                        """.format(
+                            target_table,
+                            ', '.join([c['name'] for c in columns_with_trans]),
+                            ', '.join(['s.{}'.format(c['name']) for c in columns_with_trans]),
+                            stage_table
+                        )
+                        self.logger.debug("Running query: {}".format(insert_sql))
+                        cur.execute(insert_sql)
+                        inserts = cur.rowcount
+
                     # Step 6: Drop stage table
                     cur.execute(self.drop_table_query(is_stage=True))
 
+                    self.logger.info('Loading into {}: {}'.format(
+                        self.table_name(stream, False),
+                        json.dumps({'inserts': inserts, 'updates': updates, 'size_bytes': size_bytes})))
+
         try:
-            move_data()
+            load_data()
         except InternalError_ as exc:
             if (
                 "Value too long for character type" in repr(exc)
@@ -583,15 +586,12 @@ class DbSync:
                 self.logger.info(
                     "Trying again after column size increase attempt"
                 )
-                move_data()
+                load_data()
             else:
                 raise exc
 
 
 
-                self.logger.info('Loading into {}: {}'.format(
-                    self.table_name(stream, False),
-                    json.dumps({'inserts': inserts, 'updates': updates, 'size_bytes': size_bytes})))
 
     def _increase_all_varchar_columns_to_max_size(self, table: str, schema: str):
         """
