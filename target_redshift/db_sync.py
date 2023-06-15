@@ -11,6 +11,8 @@ from typing import Any
 import boto3
 import psycopg2
 import psycopg2.extras
+from psycopg2.errors import InternalError_
+
 
 import inflection
 from singer import get_logger
@@ -19,6 +21,7 @@ from singer import get_logger
 DEFAULT_VARCHAR_LENGTH = 65535
 SHORT_VARCHAR_LENGTH = 256
 LONG_VARCHAR_LENGTH = 65535
+MAXIMUM_VARCHAR_LENGTH = 65535
 
 
 def validate_config(config):
@@ -220,6 +223,7 @@ class DbSync:
         self.stream_schema_message = stream_schema_message
         self.table_cache = table_cache
 
+        self.column_size_increase_attempted = False
 
         # logger to be used across the class's methods
         self.logger = get_logger('target_redshift')
@@ -336,6 +340,12 @@ class DbSync:
 
         return psycopg2.connect(conn_string)
 
+    def open_non_transactional_connection(self):
+
+        connection = self.open_connection()
+        connection.autocommit=True
+        return connection
+
     def query(self, query, params=None):
         self.logger.debug("Running query: {}".format(query))
         with self.open_connection() as connection:
@@ -423,6 +433,7 @@ class DbSync:
         stream = stream_schema_message['stream']
         stage_table = self.table_name(stream, is_stage=True)
         target_table = self.table_name(stream, is_stage=False)
+        target_table_no_schema = self.table_name(stream, is_stage=False, without_schema=True)
 
         self.logger.info("Loading {} rows into {}".format(count, self.table_name(stream, is_stage=True)))
 
@@ -435,119 +446,211 @@ class DbSync:
             for (name, schema) in self.flatten_schema.items()
         ]
 
-        with self.open_connection() as connection:
-            with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
-                inserts = 0
-                updates = 0
+        def load_data():
+            with self.open_connection() as connection:
+                with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                    inserts = 0
+                    updates = 0
 
-                # Step 1: Create stage table if not exists
-                cur.execute(self.drop_table_query(is_stage=True))
-                cur.execute(self.create_table_query(is_stage=True))
+                    # Step 1: Create stage table if not exists
+                    cur.execute(self.drop_table_query(is_stage=True))
+                    cur.execute(self.create_table_query(is_stage=True))
 
-                # Step 2: Generate copy credentials - prefer role if provided, otherwise use access and secret keys
-                copy_credentials = """
-                    iam_role '{aws_role_arn}'
-                """.format(aws_role_arn=self.connection_config['aws_redshift_copy_role_arn']) if self.connection_config.get("aws_redshift_copy_role_arn") else """
-                    ACCESS_KEY_ID '{aws_access_key_id}'
-                    SECRET_ACCESS_KEY '{aws_secret_access_key}'
-                    {aws_session_token}
-                """.format(
-                    aws_access_key_id=self.connection_config['aws_access_key_id'],
-                    aws_secret_access_key=self.connection_config['aws_secret_access_key'],
-                    aws_session_token="SESSION_TOKEN '{}'".format(self.connection_config['aws_session_token']) if self.connection_config.get('aws_session_token') else '',
-                )
+                    # Step 2: Generate copy credentials - prefer role if provided, otherwise use access and secret keys
+                    copy_credentials = """
+                        iam_role '{aws_role_arn}'
+                    """.format(aws_role_arn=self.connection_config['aws_redshift_copy_role_arn']) if self.connection_config.get("aws_redshift_copy_role_arn") else """
+                        ACCESS_KEY_ID '{aws_access_key_id}'
+                        SECRET_ACCESS_KEY '{aws_secret_access_key}'
+                        {aws_session_token}
+                    """.format(
+                        aws_access_key_id=self.connection_config['aws_access_key_id'],
+                        aws_secret_access_key=self.connection_config['aws_secret_access_key'],
+                        aws_session_token="SESSION_TOKEN '{}'".format(self.connection_config['aws_session_token']) if self.connection_config.get('aws_session_token') else '',
+                    )
 
-                # Step 3: Generate copy options - Override defaults from config.json if defined
-                copy_options = self.connection_config.get('copy_options',"""
-                    EMPTYASNULL BLANKSASNULL TRIMBLANKS TRUNCATECOLUMNS
-                    TIMEFORMAT 'auto'
-                    COMPUPDATE OFF STATUPDATE OFF
-                """)
+                    # Step 3: Generate copy options - Override defaults from config.json if defined
+                    copy_options = self.connection_config.get('copy_options',"""
+                        EMPTYASNULL BLANKSASNULL TRIMBLANKS TRUNCATECOLUMNS
+                        TIMEFORMAT 'auto'
+                        COMPUPDATE OFF STATUPDATE OFF
+                    """)
 
-                if compression == "gzip":
-                    compression_option = " GZIP"
-                elif compression == "bzip2":
-                    compression_option = " BZIP2"
-                else:
-                    compression_option = ""
+                    if compression == "gzip":
+                        compression_option = " GZIP"
+                    elif compression == "bzip2":
+                        compression_option = " BZIP2"
+                    else:
+                        compression_option = ""
 
-                # Step 4: Load into the stage table
-                copy_sql = """COPY {table} ({columns}) FROM 's3://{s3_bucket}/{s3_key}'
-                    {copy_credentials}
-                    {copy_options}
-                    DELIMITER ',' REMOVEQUOTES ESCAPE{compression_option}
-                """.format(
-                    table=stage_table,
-                    columns=', '.join([c['name'] for c in columns_with_trans]),
-                    s3_bucket=self.connection_config['s3_bucket'],
-                    s3_key=s3_key,
-                    copy_credentials=copy_credentials,
-                    copy_options=copy_options,
-                    compression_option=compression_option
-                )
-                self.logger.debug("Running query: {}".format(copy_sql))
-                cur.execute(copy_sql)
+                    # Step 4: Load into the stage table
+                    copy_sql = """COPY {table} ({columns}) FROM 's3://{s3_bucket}/{s3_key}'
+                        {copy_credentials}
+                        {copy_options}
+                        DELIMITER ',' REMOVEQUOTES ESCAPE{compression_option}
+                    """.format(
+                        table=stage_table,
+                        columns=', '.join([c['name'] for c in columns_with_trans]),
+                        s3_bucket=self.connection_config['s3_bucket'],
+                        s3_key=s3_key,
+                        copy_credentials=copy_credentials,
+                        copy_options=copy_options,
+                        compression_option=compression_option
+                    )
+                    self.logger.debug("Running query: {}".format(copy_sql))
+                    cur.execute(copy_sql)
 
-                # Step 5/a: Insert or Update if primary key defined
-                #           Do UPDATE first and second INSERT to calculate
-                #           the number of affected rows correctly
-                if len(stream_schema_message['key_properties']) > 0:
-                    # Step 5/a/1: Update existing records
-                    if not self.skip_updates:
-                        update_sql = """UPDATE {}
-                            SET {}
-                            FROM {} s
+                    # Step 5/a: Insert or Update if primary key defined
+                    #           Do UPDATE first and second INSERT to calculate
+                    #           the number of affected rows correctly
+                    if len(stream_schema_message['key_properties']) > 0:
+                        # Step 5/a/1: Update existing records
+                        if not self.skip_updates:
+                            update_sql = """UPDATE {}
+                                SET {}
+                                FROM {} s
+                                WHERE {}
+                            """.format(
+                                target_table,
+                                ', '.join(['{} = s.{}'.format(c['name'], c['name']) for c in columns_with_trans]),
+                                stage_table,
+                                self.primary_key_merge_condition()
+                            )
+                            self.logger.debug("Running query: {}".format(update_sql))
+                            cur.execute(update_sql)
+                            updates = cur.rowcount
+
+                        # Step 5/a/2: Insert new records
+                        insert_sql = """INSERT INTO {} ({})
+                            SELECT {}
+                            FROM {} s LEFT JOIN {}
+                            ON {}
                             WHERE {}
                         """.format(
                             target_table,
-                            ', '.join(['{} = s.{}'.format(c['name'], c['name']) for c in columns_with_trans]),
+                            ', '.join([c['name'] for c in columns_with_trans]),
+                            ', '.join(['s.{}'.format(c['name']) for c in columns_with_trans]),
                             stage_table,
-                            self.primary_key_merge_condition()
+                            target_table,
+                            self.primary_key_merge_condition(),
+                            ' AND '.join(['{}.{} IS NULL'.format(target_table, c) for c in primary_column_names(stream_schema_message)])
                         )
-                        self.logger.debug("Running query: {}".format(update_sql))
-                        cur.execute(update_sql)
-                        updates = cur.rowcount
+                        self.logger.debug("Running query: {}".format(insert_sql))
+                        cur.execute(insert_sql)
+                        inserts = cur.rowcount
 
-                    # Step 5/a/2: Insert new records
-                    insert_sql = """INSERT INTO {} ({})
-                        SELECT {}
-                        FROM {} s LEFT JOIN {}
-                        ON {}
-                        WHERE {}
-                    """.format(
-                        target_table,
-                        ', '.join([c['name'] for c in columns_with_trans]),
-                        ', '.join(['s.{}'.format(c['name']) for c in columns_with_trans]),
-                        stage_table,
-                        target_table,
-                        self.primary_key_merge_condition(),
-                        ' AND '.join(['{}.{} IS NULL'.format(target_table, c) for c in primary_column_names(stream_schema_message)])
+                    # Step 5/b: Insert only if no primary key
+                    else:
+                        insert_sql = """INSERT INTO {} ({})
+                            SELECT {}
+                            FROM {} s
+                        """.format(
+                            target_table,
+                            ', '.join([c['name'] for c in columns_with_trans]),
+                            ', '.join(['s.{}'.format(c['name']) for c in columns_with_trans]),
+                            stage_table
+                        )
+                        self.logger.debug("Running query: {}".format(insert_sql))
+                        cur.execute(insert_sql)
+                        inserts = cur.rowcount
+
+                    # Step 6: Drop stage table
+                    cur.execute(self.drop_table_query(is_stage=True))
+
+                    self.logger.info('Loading into {}: {}'.format(
+                        self.table_name(stream, False),
+                        json.dumps({'inserts': inserts, 'updates': updates, 'size_bytes': size_bytes})))
+
+        try:
+            load_data()
+        except InternalError_ as exc:
+            if (
+                "Value too long for character type" in repr(exc)
+                and not self.column_size_increase_attempted
+            ):
+                self.logger.error("Value too long for character type.")
+                self.logger.error(
+                    "Will try to increase the size of all varchar columns"
+                )
+                try:
+                    self._increase_all_varchar_columns_to_max_size(
+                        target_table_no_schema, self.schema_name
                     )
-                    self.logger.debug("Running query: {}".format(insert_sql))
-                    cur.execute(insert_sql)
-                    inserts = cur.rowcount
+                except Exception as exc:
+                    self.logger.error(
+                        f"Error running columns size increase: {exc}"
+                    )
+                finally:
+                    self.column_size_increase_attempted = True
 
-                # Step 5/b: Insert only if no primary key
+                self.logger.info(
+                    "Trying again after column size increase attempt"
+                )
+                load_data()
+            else:
+                raise exc
+
+
+
+
+    def _increase_all_varchar_columns_to_max_size(self, table: str, schema: str):
+        """
+        Try to increase all VARCHAR columns to the maximum size allowed by Redshift.
+        This is a workaround for the following error:
+        ```
+        ERROR:  value too long for type character varying(...)
+        ```
+        """
+        # Remove quotes and convert to lowercase
+        table = table.replace('"', '').lower()
+        # Get all VARCHAR column names that are not already at the maximum size
+        column_query = f"""
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = '{schema}'
+        AND table_name = '{table}'
+        AND data_type = 'character varying'
+        AND character_maximum_length <> {MAXIMUM_VARCHAR_LENGTH}
+        """
+        with self.open_non_transactional_connection() as connection:
+            with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                self.logger.info(f"Running: {column_query}")
+                cur.execute(column_query)
+                column_names = [row[0] for row in cur.fetchall()]
+                if len(column_names) > 0:
+                    self.logger.info(
+                        (
+                            "Will try to increase the size of the following "
+                            f"columns to {MAXIMUM_VARCHAR_LENGTH}: {column_names}"
+                        )
+                    )
+
+                    for column in column_names:
+                        # A column cannot always be resized, for example if they are
+                        # a DISTKEY or uses a certain type of compression algorithm.
+                        # Try to increase the size of each column individually and if
+                        # one of them fails, continue with the next one as it is not a
+                        # dealbreaker.
+                        # In almost all cases, the columns that cause size problems
+                        # are not set up as DISTKEYs.
+                        try:
+                            alter_query = f"""
+                            ALTER TABLE {schema}.{table}
+                            ALTER COLUMN {column} TYPE
+                            character varying({MAXIMUM_VARCHAR_LENGTH});
+                            """
+                            self.logger.info(f"Running: {alter_query}")
+                            cur.execute(alter_query)
+                            self.logger.info(f"Increased size for: {column}")
+                        except Exception as error:
+                            self.logger.info(
+                                (
+                                    f"Failed to increase size of column {column}. "
+                                    f"Will continue with other columns. Error: {error}"
+                                )
+                            )
                 else:
-                    insert_sql = """INSERT INTO {} ({})
-                        SELECT {}
-                        FROM {} s
-                    """.format(
-                        target_table,
-                        ', '.join([c['name'] for c in columns_with_trans]),
-                        ', '.join(['s.{}'.format(c['name']) for c in columns_with_trans]),
-                        stage_table
-                    )
-                    self.logger.debug("Running query: {}".format(insert_sql))
-                    cur.execute(insert_sql)
-                    inserts = cur.rowcount
-
-                # Step 6: Drop stage table
-                cur.execute(self.drop_table_query(is_stage=True))
-
-                self.logger.info('Loading into {}: {}'.format(
-                    self.table_name(stream, False),
-                    json.dumps({'inserts': inserts, 'updates': updates, 'size_bytes': size_bytes})))
+                    self.logger.info("All varchar columns are already at maximum size.")
 
     def primary_key_merge_condition(self):
         stream_schema_message = self.stream_schema_message
