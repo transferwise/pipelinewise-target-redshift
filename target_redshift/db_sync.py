@@ -703,7 +703,7 @@ class DbSync:
         self.query(version_column)
 
     def add_column(self, column, stream):
-        add_column = "ALTER TABLE {} ADD COLUMN {}".format(self.table_name(stream, is_stage=False), column)
+        add_column = "ALTER TABLE {} ADD COLUMN IF NOT EXISTS {}".format(self.table_name(stream, is_stage=False), column)
         self.logger.info('Adding column: {}'.format(add_column))
         self.query(add_column)
 
