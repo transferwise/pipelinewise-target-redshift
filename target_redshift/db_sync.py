@@ -680,10 +680,10 @@ class DbSync:
                column_type(properties_schema).lower() != 'timestamp without time zone'
         ]
 
-        for (column_name, column) in columns_to_replace:
-            if self.connection_config.get('is_versioning_enabled', False):
+        if self.connection_config.get('is_versioning_enabled', False):
+            for (column_name, column) in columns_to_replace:
                 self.version_column(column_name, stream)
-            self.add_column(column, stream)
+                self.add_column(column, stream)
 
         # Refresh table cache if required
         if self.table_cache and (len(columns_to_add) > 0 or len(columns_to_replace)):
@@ -703,7 +703,7 @@ class DbSync:
         self.query(version_column)
 
     def add_column(self, column, stream):
-        add_column = "ALTER TABLE {} ADD COLUMN IF NOT EXISTS {}".format(self.table_name(stream, is_stage=False), column)
+        add_column = "ALTER TABLE {} ADD COLUMN {}".format(self.table_name(stream, is_stage=False), column)
         self.logger.info('Adding column: {}'.format(add_column))
         self.query(add_column)
 
