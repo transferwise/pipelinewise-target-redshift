@@ -506,10 +506,14 @@ class DbSync:
                     self.logger.debug("Running query: {}".format(copy_sql))
                     cur.execute(copy_sql)
 
+                    # background of this setting
+                    # https://monadinc.slack.com/archives/C035P1AD9GU/p1689591712713969?thread_ts=1689587694.429569&cid=C035P1AD9GU
+                    explicitly_bypass_updates = stream_schema_message.get("explicitly_bypass_target_redshift_updates")
+
                     # Step 5/a: Insert or Update if primary key defined
                     #           Do UPDATE first and second INSERT to calculate
                     #           the number of affected rows correctly
-                    if len(stream_schema_message['key_properties']) > 0:
+                    if not explicitly_bypass_updates and len(stream_schema_message['key_properties']) > 0:
                         # Step 5/a/1: Update existing records
                         if not self.skip_updates:
                             update_sql = """UPDATE {}
