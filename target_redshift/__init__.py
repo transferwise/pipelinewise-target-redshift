@@ -227,8 +227,10 @@ def persist_lines(config, lines, table_cache=None) -> None:
             #  1) Set ` 'primary_key_required': false ` in the target-redshift config.json
             #  or
             #  2) Use fastsync [postgres-to-redshift, mysql-to-redshift, etc.]
+            print(" o is: ")
+            print(o)
             if config.get('primary_key_required', True) and len(o['key_properties']) == 0:
-                LOGGER.critical("Primary key is set to mandatory but not defined in the [{}] stream".format(stream))
+                LOGGER.critical("Primary key is set to mandatory but not defined in the [{}] stream".format(stream))                
                 raise Exception("UPDTEED: key_properties field is required")
 
             key_properties[stream] = o['key_properties']
