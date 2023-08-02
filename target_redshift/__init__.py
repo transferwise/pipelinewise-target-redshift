@@ -231,10 +231,6 @@ def persist_lines(config, lines, table_cache=None) -> None:
             LOGGER.info(o)
             LOGGER.info(" *********************** o['key_properties'] ***************************")
             LOGGER.info(o['key_properties']);
-            if config.get('primary_key_required', True) and len(o['key_properties']) == 0:
-                #LOGGER.critical("Primary key is set to mandatory but not defined in the [{}] stream".format(stream))                
-                #raise Exception("UPDTEED: key_properties field is required")
-            #o['key_properties'] = ['baseid']
             key_properties[stream] = ['baseid']
 
             if config.get('add_metadata_columns') or config.get('hard_delete'):
