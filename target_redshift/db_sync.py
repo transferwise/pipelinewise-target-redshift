@@ -560,9 +560,8 @@ class DbSync:
             )
             for (name, schema) in self.flatten_schema.items()
         ]
-
+        ['baseid']
         primary_key = ["PRIMARY KEY ({})".format(', '.join(primary_column_names(stream_schema_message)))] \
-            stream_schema_message['key_properties'] = ['baseid']
             if len(stream_schema_message['key_properties']) else []
 
         return 'CREATE TABLE IF NOT EXISTS {} ({})'.format(
