@@ -164,6 +164,8 @@ def persist_lines(config, lines, table_cache=None) -> None:
                     raise RecordValidationException(f"Record does not pass schema validation. RECORD: {o['record']}")
 
             primary_key_string = stream_to_sync[stream].record_primary_key_string(o['record'])
+            print("primary_key_string")
+            print(primary_key_string)
             if not primary_key_string:
                 primary_key_string = 'RID-{}'.format(total_row_count[stream])
 
