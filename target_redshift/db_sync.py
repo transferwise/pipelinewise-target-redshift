@@ -484,6 +484,9 @@ class DbSync:
                             self.primary_key_merge_condition()
                         )
                         self.logger.debug("Running query: {}".format(update_sql))
+                        self.logger.info(" ************ UPDATE QUERY  ************************")
+                        self.logger.info(update_sql)
+                        self.logger.info(" ************ UPDATE QUERY  ************************")
                         cur.execute(update_sql)
                         updates = cur.rowcount
 
@@ -518,9 +521,9 @@ class DbSync:
                         stage_table
                     )
                     self.logger.debug("Running query: {}".format(insert_sql))
-                    self.logger.info(" ************ QUERY  ************************")
+                    self.logger.info(" ************ INSERT QUERY  ************************")
                     self.logger.info(insert_sql)
-                    self.logger.info(" ************ QUERY  ************************")
+                    self.logger.info(" ************ INSERT QUERY  ************************")
                     cur.execute(insert_sql)
                     inserts = cur.rowcount
 
