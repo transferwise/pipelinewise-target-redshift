@@ -518,6 +518,9 @@ class DbSync:
                         stage_table
                     )
                     self.logger.debug("Running query: {}".format(insert_sql))
+                    self.logger.info(" ************ QUERY  ************************")
+                    self.logger.info(insert_sql)
+                    self.logger.info(" ************ QUERY  ************************")
                     cur.execute(insert_sql)
                     inserts = cur.rowcount
 
