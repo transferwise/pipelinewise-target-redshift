@@ -426,11 +426,13 @@ def flush_records(stream, records_to_load, row_count, db_sync, compression=None,
     # the copy key is the filename prefix without the chunk number
     copy_key = os.path.splitext(s3_keys[0])[0]
 
+    print(copy_key)
+    print(row_count)
     db_sync.load_csv(copy_key, row_count, size_bytes, compression)
     for csv_file in csv_files:
-        os.remove(csv_file)
+        #os.remove(csv_file)
     for s3_key in s3_keys:
-        db_sync.delete_from_s3(s3_key)
+        #db_sync.delete_from_s3(s3_key)
 
 
 def main():
