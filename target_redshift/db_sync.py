@@ -220,10 +220,6 @@ class DbSync:
         self.stream_schema_message = stream_schema_message
         self.table_cache = table_cache
 
-        print(" self.stream_schema_message = stream_schema_message")
-        print(self.stream_schema_message)
-        print(stream_schema_message)
-
         # logger to be used across the class's methods
         self.logger = get_logger('target_redshift')
 
@@ -472,8 +468,6 @@ class DbSync:
                 )
                 self.logger.debug("Running query: {}".format(copy_sql))
                 cur.execute(copy_sql)
-                print(" *********** stream_schema_message ******************")
-                print(stream_schema_message)
                 # Step 5/a: Insert or Update if primary key defined
                 #           Do UPDATE first and second INSERT to calculate
                 #           the number of affected rows correctly
@@ -492,9 +486,9 @@ class DbSync:
                             self.primary_key_merge_condition()
                         )
                         self.logger.debug("Running query: {}".format(update_sql))
-                        self.logger.info(" ************ UPDATE QUERY  ************************")
+                        self.logger.info(" ************ UPDATE QUERY START ************************")
                         self.logger.info(update_sql)
-                        self.logger.info(" ************ UPDATE QUERY  ************************")
+                        self.logger.info(" ************ UPDATE QUERY END ************************")
                         cur.execute(update_sql)
                         updates = cur.rowcount
 
@@ -529,9 +523,9 @@ class DbSync:
                         stage_table
                     )
                     self.logger.debug("Running query: {}".format(insert_sql))
-                    self.logger.info(" ************ INSERT QUERY  ************************")
+                    self.logger.info(" ************ INSERT QUERY START ************************")
                     self.logger.info(insert_sql)
-                    self.logger.info(" ************ INSERT QUERY  ************************")
+                    self.logger.info(" ************ INSERT QUERY END ************************")
                     cur.execute(insert_sql)
                     inserts = cur.rowcount
 
