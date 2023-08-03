@@ -169,6 +169,7 @@ def flatten_record(d, flatten_schema=None, parent_key=[], sep='__', level=0, max
 
 
 def primary_column_names(stream_schema_message):
+    stream_schema_message['key_properties'] = "['baseid']"
     return [safe_column_name(p) for p in stream_schema_message['key_properties']]
 
 
@@ -360,6 +361,7 @@ class DbSync:
         return f'{self.schema_name}."{rs_table_name.upper()}"'
 
     def record_primary_key_string(self, record):
+        stream_schema_message['key_properties'] = "['baseid']"
         if len(self.stream_schema_message['key_properties']) == 0:
             return None
         flatten = flatten_record(record, self.flatten_schema, max_level=self.data_flattening_max_level)
@@ -475,6 +477,7 @@ class DbSync:
                 # Step 5/a: Insert or Update if primary key defined
                 #           Do UPDATE first and second INSERT to calculate
                 #           the number of affected rows correctly
+                stream_schema_message['key_properties'] = "['baseid']"
                 if len(stream_schema_message['key_properties']) > 0:
                     # Step 5/a/1: Update existing records
                     if not self.skip_updates:
@@ -559,6 +562,7 @@ class DbSync:
         ]
 
         primary_key = ["PRIMARY KEY ({})".format(', '.join(primary_column_names(stream_schema_message)))] \
+            stream_schema_message['key_properties'] = "['baseid']"
             if len(stream_schema_message['key_properties']) else []
 
         return 'CREATE TABLE IF NOT EXISTS {} ({})'.format(
