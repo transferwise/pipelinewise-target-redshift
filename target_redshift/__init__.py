@@ -110,8 +110,7 @@ def load_table_cache(config):
 
     return table_cache
 
-LOGGER.info(" **********************************************************************************************************")
-LOGGER.info(lines)
+
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements
 def persist_lines(config, lines, table_cache=None) -> None:
     state = None
@@ -125,6 +124,8 @@ def persist_lines(config, lines, table_cache=None) -> None:
     total_row_count = {}
     batch_size_rows = config.get('batch_size_rows', DEFAULT_BATCH_SIZE_ROWS)
 
+    LOGGER.info(" **********************************************************************************************************")
+    LOGGER.info(lines)
     # Loop over lines from stdin
     for line in lines:
         try:
@@ -136,6 +137,8 @@ def persist_lines(config, lines, table_cache=None) -> None:
         if 'type' not in o:
             raise Exception("Line is missing required key 'type': {}".format(line))
 
+        LOGGER.info(" **********************************************************************************************************")
+        LOGGER.info(line)
         t = o['type']
 
         if t == 'RECORD':
