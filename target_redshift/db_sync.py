@@ -219,6 +219,10 @@ class DbSync:
         self.stream_schema_message = stream_schema_message
         self.table_cache = table_cache
 
+        print(" self.stream_schema_message = stream_schema_message")
+        print(self.stream_schema_message)
+        print(stream_schema_message)
+
         # logger to be used across the class's methods
         self.logger = get_logger('target_redshift')
 
