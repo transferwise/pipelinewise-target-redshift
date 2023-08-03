@@ -361,7 +361,7 @@ class DbSync:
         return f'{self.schema_name}."{rs_table_name.upper()}"'
 
     def record_primary_key_string(self, record):
-        stream_schema_message['key_properties'] = ['baseid']
+        self.stream_schema_message['key_properties'] = ['baseid']
         if len(self.stream_schema_message['key_properties']) == 0:
             return None
         flatten = flatten_record(record, self.flatten_schema, max_level=self.data_flattening_max_level)
