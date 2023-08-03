@@ -110,7 +110,8 @@ def load_table_cache(config):
 
     return table_cache
 
-
+LOGGER.info(" **********************************************************************************************************")
+LOGGER.info(lines)
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements
 def persist_lines(config, lines, table_cache=None) -> None:
     state = None
