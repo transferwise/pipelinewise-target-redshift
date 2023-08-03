@@ -124,8 +124,7 @@ def persist_lines(config, lines, table_cache=None) -> None:
     total_row_count = {}
     batch_size_rows = config.get('batch_size_rows', DEFAULT_BATCH_SIZE_ROWS)
 
-    LOGGER.info(" **********************************************************************************************************")
-    LOGGER.info(lines)
+    
     # Loop over lines from stdin
     for line in lines:
         try:
@@ -136,9 +135,7 @@ def persist_lines(config, lines, table_cache=None) -> None:
 
         if 'type' not in o:
             raise Exception("Line is missing required key 'type': {}".format(line))
-
-        LOGGER.info(" **********************************************************************************************************")
-        LOGGER.info(line)
+ 
         t = o['type']
 
         if t == 'RECORD':
@@ -231,10 +228,7 @@ def persist_lines(config, lines, table_cache=None) -> None:
             #  1) Set ` 'primary_key_required': false ` in the target-redshift config.json
             #  or
             #  2) Use fastsync [postgres-to-redshift, mysql-to-redshift, etc.]
-            LOGGER.info(" o is: ")
-            LOGGER.info(o)
-            LOGGER.info(" *********************** o['key_properties'] ***************************")
-            LOGGER.info(o['key_properties']);
+            
             key_properties[stream] = ['baseid']
 
             if config.get('add_metadata_columns') or config.get('hard_delete'):
