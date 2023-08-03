@@ -164,8 +164,6 @@ def persist_lines(config, lines, table_cache=None) -> None:
                     raise RecordValidationException(f"Record does not pass schema validation. RECORD: {o['record']}")
 
             primary_key_string = stream_to_sync[stream].record_primary_key_string(o['record'])
-            print("primary_key_string")
-            print(primary_key_string)
             if not primary_key_string:
                 primary_key_string = 'RID-{}'.format(total_row_count[stream])
 
@@ -428,8 +426,6 @@ def flush_records(stream, records_to_load, row_count, db_sync, compression=None,
     # the copy key is the filename prefix without the chunk number
     copy_key = os.path.splitext(s3_keys[0])[0]
 
-    print(copy_key)
-    print(row_count)
     db_sync.load_csv(copy_key, row_count, size_bytes, compression)
     for csv_file in csv_files:
         os.remove(csv_file)
