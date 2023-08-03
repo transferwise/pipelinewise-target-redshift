@@ -466,7 +466,8 @@ class DbSync:
                 )
                 self.logger.debug("Running query: {}".format(copy_sql))
                 cur.execute(copy_sql)
-
+                print(" *********** stream_schema_message ******************")
+                print(stream_schema_message)
                 # Step 5/a: Insert or Update if primary key defined
                 #           Do UPDATE first and second INSERT to calculate
                 #           the number of affected rows correctly
