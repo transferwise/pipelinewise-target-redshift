@@ -722,6 +722,10 @@ class DbSync:
     def sync_table(self):
         stream_schema_message = self.stream_schema_message
         stream = stream_schema_message['stream']
+
+        if stream in self.connection_config.get('overwrite_streams', []):
+            self.create_table_and_grant_privilege()
+
         table_name = self.table_name(stream, is_stage=False, without_schema=True)
         table_name_with_schema = self.table_name(stream, is_stage=False, without_schema=False)
 
