@@ -396,7 +396,7 @@ class DbSync:
     def delete_from_s3(self, s3_key):
         self.logger.info("Deleting {} from S3".format(s3_key))
         bucket = self.connection_config['s3_bucket']
-        #self.s3.delete_object(Bucket=bucket, Key=s3_key)
+        self.s3.delete_object(Bucket=bucket, Key=s3_key)
 
     # pylint: disable=too-many-locals
     def load_csv(self, s3_key, count, size_bytes, compression=False):
