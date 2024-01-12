@@ -1,3 +1,15 @@
+1.6.0-2 (SIGNAL AI) (2024-01-12)
+--------------------------------
+
+- Add zstd compression support on COPY
+
+1.6.0-1 (SIGNAL AI) (2024-01-12)
+--------------------------------
+
+- Update dependencies (support Python 3.11)
+- `object` types are converted to `SUPER` in redshift
+- Fix log (see https://github.com/transferwise/pipelinewise-target-redshift/pull/70)
+
 1.6.0 (2020-08-03)
 -------------------
 
