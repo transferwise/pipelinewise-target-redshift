@@ -16,8 +16,8 @@ import time
 
 import boto3
 import inflection
-import psycopg2
-import psycopg2.extras
+import psycopg
+import psycopg.extras
 from singer import get_logger
 
 DEFAULT_VARCHAR_LENGTH = 10000
@@ -334,12 +334,12 @@ class DbSync:
             self.connection_config['port']
         )
 
-        return psycopg2.connect(conn_string)
+        return psycopg.connect(conn_string)
 
     def query(self, query, params=None):
         self.logger.debug("Running query: {}".format(query))
         with self.open_connection() as connection:
-            with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+            with connection.cursor(cursor_factory=psycopg.extras.DictCursor) as cur:
                 cur.execute(
                     query,
                     params
@@ -423,7 +423,7 @@ class DbSync:
         ]
 
         with self.open_connection() as connection:
-            with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+            with connection.cursor(cursor_factory=psycopg.extras.DictCursor) as cur:
                 inserts = 0
                 updates = 0
 
@@ -745,5 +745,5 @@ class DbSync:
             self.logger.info("Table '{}' does not exist. Creating...".format(table_name_with_schema))
             self.create_table_and_grant_privilege()
         else:
-            self.logger.info("Table '{}' exists".format(self.schema_name))
+            self.logger.info("Table '{}' exists".format(table_name_with_schema))
             self.update_columns()
