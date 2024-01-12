@@ -17,7 +17,6 @@ import time
 import boto3
 import inflection
 import psycopg
-import psycopg.extras
 from singer import get_logger
 
 DEFAULT_VARCHAR_LENGTH = 10000
@@ -339,7 +338,7 @@ class DbSync:
     def query(self, query, params=None):
         self.logger.debug("Running query: {}".format(query))
         with self.open_connection() as connection:
-            with connection.cursor(cursor_factory=psycopg.extras.DictCursor) as cur:
+            with connection.cursor(row_factory=psycopg.rows.dict_row) as cur:
                 cur.execute(
                     query,
                     params
@@ -423,7 +422,7 @@ class DbSync:
         ]
 
         with self.open_connection() as connection:
-            with connection.cursor(cursor_factory=psycopg.extras.DictCursor) as cur:
+            with connection.cursor(row_factory=psycopg.rows.dict_row) as cur:
                 inserts = 0
                 updates = 0
 
@@ -455,6 +454,8 @@ class DbSync:
                     compression_option = " GZIP"
                 elif compression == "bzip2":
                     compression_option = " BZIP2"
+                elif compression == "zstd":
+                    compression_option = " ZSTD"
                 else:
                     compression_option = ""
 

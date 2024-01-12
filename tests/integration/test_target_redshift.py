@@ -357,6 +357,15 @@ class TestTargetRedshift(object):
 
         self.assert_three_streams_are_loaded_in_redshift()
 
+    def test_loading_tables_with_zstd_compression(self):
+        """Loading multiple tables from the same input tap with various columns types and zstd compression"""
+        tap_lines = test_utils.get_test_tap_lines("messages-with-three-streams.json")
+
+        self.config["compression"] = "zstd"
+        target_redshift.persist_lines(self.config, tap_lines)
+
+        self.assert_three_streams_are_loaded_in_redshift()
+
     def test_loading_tables_with_hard_delete(self):
         """Loading multiple tables from the same input tap with deleted rows"""
         tap_lines = test_utils.get_test_tap_lines("messages-with-three-streams.json")

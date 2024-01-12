@@ -8,6 +8,7 @@ import sys
 import copy
 import gzip
 import bz2
+import zstandard as zstd
 from datetime import datetime
 from decimal import Decimal
 from tempfile import mkstemp
@@ -375,6 +376,7 @@ def flush_records(stream, records_to_load, row_count, db_sync, compression=None,
     slices = slices or 1
     use_gzip = compression == "gzip"
     use_bzip2 = compression == "bzip2"
+    use_zstd = compression == "zstd"
 
     if temp_dir:
         temp_dir = os.path.expanduser(temp_dir)
@@ -388,6 +390,9 @@ def flush_records(stream, records_to_load, row_count, db_sync, compression=None,
     elif use_bzip2:
         open_method = bz2.open
         file_extension = file_extension + ".bz2"
+    elif use_zstd:
+        open_method = zstd.open
+        file_extension = file_extension + ".zstd"
 
     if not isinstance(slices, int):
         raise Exception("The provided configuration value 'slices' was not an integer")
