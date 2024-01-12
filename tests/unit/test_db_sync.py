@@ -1,4 +1,3 @@
-import pytest
 import target_redshift
 
 
@@ -72,7 +71,7 @@ class TestTargetRedshift(object):
         json_bool =         {"type": ["boolean"]            }
         json_obj =          {"type": ["object"]             }
         json_arr =          {"type": ["array"]              }
-        
+
         # Mapping from JSON schema types ot Redshift column types
         assert mapper(json_str)          == 'character varying(10000)'
         assert mapper(json_str_or_null)  == 'character varying(10000)'
@@ -84,7 +83,7 @@ class TestTargetRedshift(object):
         assert mapper(json_int)          == 'numeric'
         assert mapper(json_int_or_str)   == 'character varying(65535)'
         assert mapper(json_bool)         == 'boolean'
-        assert mapper(json_obj)          == 'character varying(65535)'
+        assert mapper(json_obj)          == 'super'
         assert mapper(json_arr)          == 'character varying(65535)'
 
 

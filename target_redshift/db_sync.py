@@ -1,5 +1,6 @@
 
 import sys
+
 # pylint: disable=no-name-in-module
 if sys.version_info.major == 3 and sys.version_info.minor >= 10:
     from collections.abc import MutableMapping
@@ -14,12 +15,10 @@ import re
 import time
 
 import boto3
+import inflection
 import psycopg2
 import psycopg2.extras
-
-import inflection
 from singer import get_logger
-
 
 DEFAULT_VARCHAR_LENGTH = 10000
 SHORT_VARCHAR_LENGTH = 256
@@ -58,7 +57,9 @@ def column_type(schema_property, with_length=True):
     varchar_length = DEFAULT_VARCHAR_LENGTH
     if schema_property.get('maxLength', 0) > varchar_length:
         varchar_length = LONG_VARCHAR_LENGTH
-    if 'object' in property_type or 'array' in property_type:
+    if 'object' in property_type:
+        column_type = 'super'
+    if 'array' in property_type:
         column_type = 'character varying'
         varchar_length = LONG_VARCHAR_LENGTH
 
