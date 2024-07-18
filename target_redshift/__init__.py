@@ -123,7 +123,6 @@ def persist_lines(config, lines, table_cache=None) -> None:
     stream_to_sync = {}
     total_row_count = {}
     batch_size_rows = config.get('batch_size_rows', DEFAULT_BATCH_SIZE_ROWS)
-
     
     # Loop over lines from stdin
     for line in lines:
