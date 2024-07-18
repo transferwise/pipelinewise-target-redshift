@@ -554,7 +554,7 @@ class DbSync:
             )
             for (name, schema) in self.flatten_schema.items()
         ]
-        ['baseid']
+   
         primary_key = ["PRIMARY KEY ({})".format(', '.join(primary_column_names(stream_schema_message)))] \
             if len(stream_schema_message['key_properties']) else []
 
