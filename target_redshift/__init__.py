@@ -122,7 +122,8 @@ def persist_lines(config, lines, table_cache=None) -> None:
     row_count = {}
     stream_to_sync = {}
     total_row_count = {}
-    batch_size_rows = config.get('batch_size_rows', DEFAULT_BATCH_SIZE_ROWS)    
+    batch_size_rows = config.get('batch_size_rows', DEFAULT_BATCH_SIZE_ROWS)
+
     # Loop over lines from stdin
     for line in lines:
         try:
@@ -132,7 +133,8 @@ def persist_lines(config, lines, table_cache=None) -> None:
             raise
 
         if 'type' not in o:
-            raise Exception("Line is missing required key 'type': {}".format(line)) 
+            raise Exception("Line is missing required key 'type': {}".format(line))
+
         t = o['type']
 
         if t == 'RECORD':
@@ -224,7 +226,13 @@ def persist_lines(config, lines, table_cache=None) -> None:
             # If you want to load tables with no Primary Key:
             #  1) Set ` 'primary_key_required': false ` in the target-redshift config.json
             #  or
-            #  2) Use fastsync [postgres-to-redshift, mysql-to-redshift, etc.]            
+            #  2) Use fastsync [postgres-to-redshift, mysql-to-redshift, etc.]
+            if config.get('primary_key_required', True) and len(o['key_properties']) == 0:
+                LOGGER.critical("Primary key is set to mandatory but not defined in the [{}] stream".format(stream))
+                raise Exception("key_properties field is required")
+
+            key_properties[stream] = o['key_properties']
+
             if config.get('add_metadata_columns') or config.get('hard_delete'):
                 stream_to_sync[stream] = DbSync(config, add_metadata_columns_to_schema(o), table_cache)
             else:
