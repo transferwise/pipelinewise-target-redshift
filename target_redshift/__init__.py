@@ -229,8 +229,6 @@ def persist_lines(config, lines, table_cache=None) -> None:
             #  or
             #  2) Use fastsync [postgres-to-redshift, mysql-to-redshift, etc.]
             
-            key_properties[stream] = ['baseid']
-
             if config.get('add_metadata_columns') or config.get('hard_delete'):
                 stream_to_sync[stream] = DbSync(config, add_metadata_columns_to_schema(o), table_cache)
             else:
