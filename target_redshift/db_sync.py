@@ -737,5 +737,5 @@ class DbSync:
             self.logger.info("Table '{}' does not exist. Creating...".format(table_name_with_schema))
             self.create_table_and_grant_privilege()
         else:
-            self.logger.info("Table '{}' exists".format(self.schema_name))
+            self.logger.info("Table '{}' exists".format(table_name_with_schema))
             self.update_columns()
