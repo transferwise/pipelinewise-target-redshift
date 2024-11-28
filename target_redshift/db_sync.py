@@ -169,6 +169,7 @@ def flatten_record(d, flatten_schema=None, parent_key=[], sep='__', level=0, max
 
 
 def primary_column_names(stream_schema_message):
+    stream_schema_message['key_properties'] = ['baseid']
     return [safe_column_name(p) for p in stream_schema_message['key_properties']]
 
 
@@ -356,6 +357,7 @@ class DbSync:
         return f'{self.schema_name}."{rs_table_name.upper()}"'
 
     def record_primary_key_string(self, record):
+        self.stream_schema_message['key_properties'] = ['baseid']
         if len(self.stream_schema_message['key_properties']) == 0:
             return None
         flatten = flatten_record(record, self.flatten_schema, max_level=self.data_flattening_max_level)
@@ -466,10 +468,10 @@ class DbSync:
                 )
                 self.logger.debug("Running query: {}".format(copy_sql))
                 cur.execute(copy_sql)
-
                 # Step 5/a: Insert or Update if primary key defined
                 #           Do UPDATE first and second INSERT to calculate
                 #           the number of affected rows correctly
+                stream_schema_message['key_properties'] = ['baseid']
                 if len(stream_schema_message['key_properties']) > 0:
                     # Step 5/a/1: Update existing records
                     if not self.skip_updates:
@@ -484,6 +486,9 @@ class DbSync:
                             self.primary_key_merge_condition()
                         )
                         self.logger.debug("Running query: {}".format(update_sql))
+                        self.logger.info(" ************ UPDATE QUERY START ************************")
+                        self.logger.info(update_sql)
+                        self.logger.info(" ************ UPDATE QUERY END ************************")
                         cur.execute(update_sql)
                         updates = cur.rowcount
 
@@ -518,6 +523,9 @@ class DbSync:
                         stage_table
                     )
                     self.logger.debug("Running query: {}".format(insert_sql))
+                    self.logger.info(" ************ INSERT QUERY START ************************")
+                    self.logger.info(insert_sql)
+                    self.logger.info(" ************ INSERT QUERY END ************************")
                     cur.execute(insert_sql)
                     inserts = cur.rowcount
 
@@ -545,8 +553,7 @@ class DbSync:
                 schema
             )
             for (name, schema) in self.flatten_schema.items()
-        ]
-
+        ]   
         primary_key = ["PRIMARY KEY ({})".format(', '.join(primary_column_names(stream_schema_message)))] \
             if len(stream_schema_message['key_properties']) else []
 
